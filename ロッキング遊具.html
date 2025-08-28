@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ぶっ飛びロッキング遊具</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: sans-serif;
+      background: linear-gradient(#a0eaff, #d0f0ff);
+      overflow: hidden;
+    }
+
+    #rocking {
+      margin: 60px auto;
+      width: 300px;
+      height: 217px;
+      background: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQJuDQil9sZAacUaezr-v2yYzxF63_fJDi1vg&s') center/contain no-repeat;
+      transform-origin: center center;
+      transition: transform 0.05s linear;
+      box-shadow: 0 20px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    #pressBtn {
+      font-size: 20px;
+      padding: 12px 24px;
+      cursor: pointer;
+      background-color: #ff8c00;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    #message {
+      font-size: 18px;
+      color: red;
+      margin-top: 10px;
+      height: 24px;
+    }
+
+    #speedBarContainer {
+      width: 300px;
+      height: 16px;
+      background: #ccc;
+      margin: 10px auto;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #speedBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #00f260, #0575e6);
+      transition: width 0.05s;
+    }
+
+    #flyCountDisplay {
+      font-size: 18px;
+    }
+
+    #distanceDisplay {
+      font-size: 18px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>ぶっ飛びロッキング遊具</h1>
+  <div id="rocking"></div>
+  <button id="pressBtn">タップで回す！</button>
+
+  <div id="speedBarContainer"><div id="speedBar"></div></div>
+  <div id="flyCountDisplay">とんだ回数: 0</div>
+  <div id="distanceDisplay"></div>
+  <div id="message"></div>
+
+  <audio id="spinSound" src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Buttonclick02.ogg"></audio>
+  <audio id="flySound" src="https://upload.wikimedia.org/wikipedia/commons/9/97/Whoosh.ogg"></audio>
+
+  <script>
+    const rocking = document.getElementById('rocking');
+    const button = document.getElementById('pressBtn');
+    const message = document.getElementById('message');
+    const flyCountDisplay = document.getElementById('flyCountDisplay');
+    const speedBar = document.getElementById('speedBar');
+    const distanceDisplay = document.getElementById('distanceDisplay');
+
+    const spinSound = document.getElementById('spinSound');
+    const flySound = document.getElementById('flySound');
+
+    let angle = 0;
+    let angularVelocity = 0;
+    let flyCount = Number(localStorage.getItem("flyCount")) || 0;
+    let flying = false;
+
+    const FLY_TRIGGER_SPEED = 40;
+    const FLY_POWER = 40 * 40; // 40倍速で飛ぶ
+
+    flyCountDisplay.textContent = `とんだ回数: ${flyCount}`;
+
+    function animate() {
+      if (!flying) {
+        angle += angularVelocity;
+        angularVelocity *= 0.98;
+
+        rocking.style.transform = `rotate(${angle}deg)`;
+
+        const percent = Math.min(angularVelocity / FLY_TRIGGER_SPEED, 1) * 100;
+        speedBar.style.width = `${percent}%`;
+
+        if (angularVelocity >= FLY_TRIGGER_SPEED) {
+          flyAway();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function flyAway() {
+      flying = true;
+      flyCount++;
+      localStorage.setItem("flyCount", flyCount);
+      flyCountDisplay.textContent = `とんだ回数: ${flyCount}`;
+
+      const angleDeg = 45 + Math.random() * 90;  // 45〜90度のランダム角度
+      const rad = angleDeg * Math.PI / 180;
+      const dx = Math.cos(rad) * FLY_POWER;
+      const dy = Math.sin(rad) * FLY_POWER;
+      const distance = Math.round(Math.sqrt(dx * dx + dy * dy));
+
+      flySound.currentTime = 0;
+      flySound.play();
+
+      rocking.style.transition = 'transform 1s ease-out';
+      rocking.style.transform = `translate(${dx}px, ${-dy}px) rotate(${angle + 1440}deg)`;
+
+      message.textContent = 'ぶっ飛んだー！！';
+      distanceDisplay.textContent = `飛距離: ${distance}px / 方向: ${angleDeg.toFixed(1)}度`;
+
+      setTimeout(() => {
+        rocking.style.transition = 'transform 1s ease-in';
+        rocking.style.transform = 'translate(0, 0) rotate(0deg)';
+      }, 1200);
+
+      setTimeout(() => {
+        angle = 0;
+        angularVelocity = 0;
+        flying = false;
+        message.textContent = '戻ってきたよ！';
+        distanceDisplay.textContent = '';
+        rocking.style.transition = '';  // ここでリセット
+      }, 2400);
+    }
+
+    button.addEventListener('click', () => {
+      if (flying) return;
+      angularVelocity += 5 + Math.random() * 5;
+      spinSound.currentTime = 0;
+      spinSound.play();
+      message.textContent = '';
+    });
+
+    button.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      button.click();
+    });
+
+    animate();
+  </script>
+</body>
+</html>
