@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>よく使うサイト一覧</title>
+  <style>
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1f2937, #4b5563);
+      color: #f9fafb;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-bottom: 100px;
+    }
+    header {
+      margin: 2rem 0 3rem;
+      text-align: center;
+    }
+    header h1 {
+      font-size: 3rem;
+      letter-spacing: 0.1em;
+      animation: fadeInDown 1s ease forwards;
+      opacity: 0;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      margin-top: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    nav a {
+      color: #9ca3af;
+      text-decoration: none;
+      font-weight: 600;
+      position: relative;
+      padding-bottom: 4px;
+      transition: color 0.3s ease;
+    }
+    nav a::after {
+      content: "";
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 100%; height: 2px;
+      background: #38bdf8;
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform 0.3s ease;
+    }
+    nav a:hover {
+      color: #38bdf8;
+    }
+    nav a:hover::after {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+      width: 90%;
+      max-width: 1200px;
+    }
+    .card {
+      display: block;
+      background: #374151;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 15px rgba(8, 145, 178, 0.3);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+      color: #e0e7ff;
+      text-decoration: none;
+    }
+    .card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 20px 30px rgba(56, 189, 248, 0.6);
+    }
+    .card h2 {
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+    .card p {
+      line-height: 1.5;
+      color: #cbd5e1;
+    }
+    h2.section-title {
+      grid-column: 1 / -1;
+      margin: 2rem 0 0.5rem;
+      font-size: 2rem;
+      color: #a5f3fc;
+      border-bottom: 2px solid #38bdf8;
+      padding-bottom: 0.5rem;
+    }
+    @keyframes fadeInDown {
+      0% {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    /* トップに戻るボタン */
+    .back-to-top {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #38bdf8;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 50%;
+      font-size: 20px;
+      text-align: center;
+      text-decoration: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: background 0.3s ease;
+    }
+    .back-to-top:hover {
+      background: #0ea5e9;
+    }
+  </style>
+</head>
+<body>
+  <header id="top">
+    <h1>My Site</h1>
+    <nav>
+      <a href="#entertainment">娯楽</a>
+      <a href="#study">学業</a>
+      <a href="#presen">リベラル</a>
+      <a href="#hobby">趣味</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <h2 id="entertainment" class="section-title">🎮 娯楽</h2>
+    <a href="https://www.youtube.com/?app=desktop&hl=ja" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>YouTube</h2>
+      <p>youtubeは楽しいけど現実逃避しないでね。</p>
+    </a>
+    <a href="https://chatgpt.com/?model=auto" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>ChatGPT</h2>
+      <p>AIで、正しく使って知識を増やしましょう。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/castle.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>タワーディフェンス</h2>
+      <p>敵を倒す快感を味わおう！</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E3%82%A8%E3%82%A2%E3%83%9B%E3%83%83%E3%82%B1%E3%83%BC.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>エアホッケー</h2>
+      <p>敵を騙す快感を味わおう！</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E3%83%AD%E3%83%83%E3%82%AD%E3%83%B3%E3%82%B0%E9%81%8A%E5%85%B7.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>ロッキング遊具</h2>
+      <p>遊具を飛ばしまくろう！</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/action.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>避けゲー</h2>
+      <p>ボウリングのピンをように耐えよう！</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E3%81%82%E3%81%BF%E3%81%A0%E3%81%8F%E3%81%98.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>人生あみだくじ</h2>
+      <p>来世を決めてみよう♫</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E8%BF%B7%E8%B7%AF%E9%AC%BC%E3%81%94%E3%81%A3%E3%81%93ver1.0.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>迷路鬼ごっこver1.0</h2>
+      <p>このゲームの原点。フライングできるよ。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E8%BF%B7%E8%B7%AF%E9%AC%BC%E3%81%94%E3%81%A3%E3%81%93ver1.1.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>迷路鬼ごっこver1.1</h2>
+      <p>フライング不可。２つボタン追加。鬼の微強化と迷路の延長。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E8%BF%B7%E8%B7%AF%E9%AC%BC%E3%81%94%E3%81%A3%E3%81%93ver1.2.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>迷路鬼ごっこver1.2</h2>
+      <p>現最新バージョン。拡大鏡。キーの表示。２つボタンの廃止。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E3%83%90%E3%83%AC%E3%82%8B%E3%81%AA%EF%BC%81%E3%83%91%E3%82%BD%E3%82%B3%E3%83%B3.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>バレずにゲーム</h2>
+      <p>先生にパソコンを開いてもバレないようにしょう♫</p>
+    </a>
+
+    <h2 id="study" class="section-title">📚 学業</h2>
+    <a href="https://classroom.google.com/c/NzUzNjE3MjAwNTQ4" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>本当のクラスルーム</h2>
+      <p>2Aのクラスルームです。頑張って毎日投稿してます。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E6%93%AC%E4%BC%BC%E3%82%AF%E3%83%A9%E3%82%B9%E3%83%AB%E3%83%BC%E3%83%A0.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>疑似クラスルーム</h2>
+      <p>学年委員のためのサイトで楽しもう。</p>
+    </a>
+    <a href="https://www.google.com/search?q=電卓" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>電卓</h2>
+      <p>電卓で暗算王になろう！（笑）</p>
+    </a>
+    <a href="https://www.geogebra.org/calculator" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>関数電卓</h2>
+      <p>関数電卓で色んな人を惑わせよう。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/firewoeks.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>3D花火</h2>
+      <p>3D花火で心を休めよう。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E5%AE%87%E5%AE%99.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>宇宙の神秘</h2>
+      <p>宇宙のかっこよさに心奪われよう♫</p>
+    </a>
+    <a href="https://online-voice-recorder.com/ja/" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>録音</h2>
+      <p>水素の音と米ちゃんの「負けないで」を録音しよう！</p>
+    </a>
+    <a href="https://ondoku3.com/ja/" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>音声くん</h2>
+      <p>AI音声で回答して笑わせよう。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E6%99%82%E8%A8%88.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>かっこいいの時計</h2>
+      <p>２分前行動を呼びかけれるようにしよう♫</p>
+    </a>
+    <a href="https://www.lentrance.com/reader/portal.html?1eeaa802b" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>Lentrance</h2>
+      <p>Lentranceで暗唱を繰り返そう。</p>
+    </a>
+    <a href="https://www.deepl.com/ja/translator" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>翻訳</h2>
+      <p>翻訳で積極的に外国人と話そう。</p>
+    </a>
+    <a href="https://docs.google.com/presentation/d/15inSx9nu2dwdH9D6HdWOqTKH3Z_AwBCb3Q27EHSvVLA/edit?slide=id.p#slide=id.p" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>中距離記録</h2>
+      <p>人見絹枝を完走した感想を述べたい！</p>
+    </a>
+
+    <h2 id="presen" class="section-title">🦜　リベラル</h2>
+    <a href="https://docs.google.com/presentation/d/1JDPvKp3kgd7h0xozTzclhJnO1D8qGivlo1b_JJamTM0/edit?slide=id.p#slide=id.p" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>ナンプレ</h2>
+      <p>やってるやついたらまずい(^_^;)</p>
+    </a>
+    <a href="https://docs.google.com/presentation/d/1b5Hy-56D94b5SMYkt8fr4JvS0ailsaBS25RTP8MBXI4/edit?slide=id.p#slide=id.p" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>アルゴリズム</h2>
+      <p>入社試験でも出た考えるやつ！（発表済み & 結構好評）</p>
+    </a>
+    <a href="https://docs.google.com/presentation/d/1AkSREn0jkt6_UiZiSB8zXUkqR-ggQ78A0YFgM_jS7PU/edit?slide=id.p#slide=id.p" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>激動の日</h2>
+      <p>むっちゃ懐かしい</p>
+    </a>
+    <a href="https://docs.google.com/presentation/d/1-1_5kxDfBs0soDa2rJvcaO1rTJFmuJJZmfE7xm8z4Tk/edit?slide=id.p#slide=id.p" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>能開の成績</h2>
+      <p>私の過去の栄光　　　　　　　＃広福受かったんだぞ</p>
+    </a>
+    <a href="https://docs.google.com/presentation/d/1ToX0znej6GuDg7S9Lx3oNZWKumhruDMe0oUAVkeIT04/edit?slide=id.g2e0f77d4330_0_5#slide=id.g2e0f77d4330_0_5" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>音の呼吸</h2>
+      <p>芸術は爆発だ　　　　　　　　　🥇派手に行こう"ZE"</p>
+    </a>
+    <a href="https://docs.google.com/presentation/d/1ztlQyG7LOk9rtdbNkKm7JSddGcZKi3mnDBunQIvhWQI/edit?slide=id.p#slide=id.p" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>不敗の消しバトラー</h2>
+      <p>消しゴムを魔改造の夜します</p>
+    </a>
+    <a href="https://docs.google.com/document/d/11uMDBKoiIiVbd3x7cpWwfSTlzdslHYBcyI2dvxJraek/edit?tab=t.0" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>共有</h2>
+      <p>ゲームのコードを貼り付けよう♫</p>
+    </a>
+    <a href="https://www.ted.com/talks/simone_giertz_why_you_should_make_useless_things?subtitle=ja" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>TED</h2>
+      <p>TEDでリベラルアーツのお手本に使用しよう。</p>
+    </a>
+
+    <h2 id="hobby" class="section-title">🧪 趣味</h2>
+    <a href="https://www.sony.jp/ichigan/lineup/" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>ソニーカメラ</h2>
+      <p>ソニーの究極のカメラを体験しましょう。</p>
+    </a>
+    <a href="https://personal.canon.jp/product/camera/eos" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>キャノンカメラ</h2>
+      <p>キャノンの究極のカメラを体験しましょう。</p>
+    </a>
+    <a href="https://vscode.dev/?vscode-lang=ja" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>VS Code</h2>
+      <p>vscodeで不具合を修正しよう。</p>
+    </a>
+    <a href="file:///media/fuse/drivefs-72229eb4e63ac4e612e77bfe4ba965c0/root/%E3%82%AD%E3%83%BC%E3%83%9C%E3%83%BC%E3%83%89.html" target="_blank" class="card" rel="noopener noreferrer">
+      <h2>タイピング練習場</h2>
+      <p>ブラインドタッチを習得しよう！</p>
+    </a>
+  </main>
+
+  <!-- トップへ戻るボタン -->
+  <a href="#top" class="back-to-top" title="トップへ戻る">↑</a>
+
+</body>
+</html>
