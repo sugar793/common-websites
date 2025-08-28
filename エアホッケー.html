@@ -1,0 +1,328 @@
+あなた:
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>エアホッケーゲーム</title>
+  <style>
+    body {
+      margin: 0;
+      background: #006;
+      font-family: 'Segoe UI', sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+    canvas {
+      background: #003366;
+      border: 5px solid white;
+      display: block;
+      margin: 140px auto 0;
+    }
+    #scoreboard {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      font-size: 48px;
+      font-weight: bold;
+      color: white;
+      display: flex;
+      justify-content: center;
+      gap: 80px;
+      z-index: 1;
+    }
+    .score {
+      background: #111;
+      padding: 10px 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px #000;
+      transform: scale(1);
+      transition: transform 0.2s ease;
+    }
+    .score.animate {
+      transform: scale(1.5);
+    }
+    #goalFlash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255,255,0,0.4);
+      z-index: 3;
+      display: none;
+      animation: flash 0.5s ease;
+    }
+    @keyframes flash {
+      0% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    #menu, #resultScreen {
+      text-align: center;
+      margin-top: 60px;
+      color: white;
+    }
+    button {
+      font-size: 18px;
+      padding: 10px 20px;
+      margin: 10px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: none;
+      background: #0099ff;
+      color: white;
+    }
+    button:hover {
+      background: #007acc;
+    }
+    #backBtn {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: crimson;
+      z-index: 2;
+    }
+    #resetBtn {
+      position: fixed;
+      top: 10px;
+      right: 150px;
+      background: green;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>エアホッケーゲーム</h1>
+  <button onclick="startGame()">2人対戦スタート</button>
+</div>
+
+<div id="scoreboard" style="display:none;">
+  <div id="score1" class="score">0</div>
+  <div id="score2" class="score">0</div>
+</div>
+<div id="goalFlash"></div>
+<canvas id="gameCanvas" width="1024" height="512" style="display:none;"></canvas>
+
+<div id="resultScreen" style="display:none;">
+  <h1 id="resultText"></h1>
+  <button onclick="restartGame()">もう一度</button>
+</div>
+
+<button id="backBtn" onclick="goBack()" style="display:none;">選択画面へ</button>
+<button id="resetBtn" onclick="resetScores()" style="display:none;">スコアリセット</button>
+
+<script>
+let canvas = document.getElementById("gameCanvas");
+let ctx = canvas.getContext("2d");
+let leftPaddleX = 10, rightPaddleX = canvas.width - 10 - 15;
+let leftPaddleY, rightPaddleY, puckX, puckY, puckSpeedX, puckSpeedY;
+let puckSpin = 0;
+let leftScore = 0, rightScore = 0;
+const paddleWidth = 15, paddleHeight = 100, puckRadius = 12, paddleSpeed = 8;
+let keys = {}, animationId, maxSpeed = 8;
+let puckSpeedTime = 0;
+let spawnTimer = 0;
+let spawning = false;
+let trail = [];
+
+function startGame() {
+  document.getElementById("menu").style.display = "none";
+  canvas.style.display = "block";
+  document.getElementById("scoreboard").style.display = "flex";
+  document.getElementById("backBtn").style.display = "inline";
+  document.getElementById("resetBtn").style.display = "inline";
+  reset();
+  cancelAnimationFrame(animationId);
+  gameLoop();
+}
+
+function reset() {
+  leftPaddleY = rightPaddleY = canvas.height / 2 - paddleHeight / 2;
+  leftPaddleX = 10;
+  rightPaddleX = canvas.width - 10 - paddleWidth;
+  leftScore = 0;
+  rightScore = 0;
+  updateScoreDisplay();
+  spawnPuck();
+}
+
+function showGoalAnimation() {
+  const flash = document.getElementById("goalFlash");
+  flash.style.display = "block";
+  flash.style.animation = "none";
+  flash.offsetHeight; // reflow
+  flash.style.animation = "flash 0.5s ease";
+  setTimeout(() => flash.style.display = "none", 500);
+}
+
+function spawnPuck() {
+  spawning = true;
+  spawnTimer = 60;
+  puckX = canvas.width / 2;
+  puckY = 60;
+  puckSpeedX = 0;
+  puckSpeedY = 0;
+  puckSpin = 0;
+  puckSpeedTime = 0;
+  trail = [];
+}
+
+function launchPuck() {
+  puckSpeedX = (Math.random() < 0.5 ? -1 : 1) * 2.5;
+  puckSpeedY = 2.5;
+  puckSpin = 0;
+  puckSpeedTime = 0;
+  spawning = false;
+}
+
+function updateScoreDisplay() {
+  const s1 = document.getElementById("score1");
+  const s2 = document.getElementById("score2");
+  s1.textContent = leftScore;
+  s2.textContent = rightScore;
+  s1.classList.add("animate");
+  s2.classList.add("animate");
+  setTimeout(() => {
+    s1.classList.remove("animate");
+    s2.classList.remove("animate");
+  }, 200);
+}
+
+function gameLoop() {
+  if (keys["KeyW"] && leftPaddleY > 0) leftPaddleY -= paddleSpeed;
+  if (keys["KeyS"] && leftPaddleY < canvas.height - paddleHeight) leftPaddleY += paddleSpeed;
+  if (keys["KeyA"] && leftPaddleX > 0) leftPaddleX -= paddleSpeed;
+  if (keys["KeyD"] && leftPaddleX < canvas.width / 2 - paddleWidth) leftPaddleX += paddleSpeed;
+
+  if (keys["ArrowUp"] && rightPaddleY > 0) rightPaddleY -= paddleSpeed;
+  if (keys["ArrowDown"] && rightPaddleY < canvas.height - paddleHeight) rightPaddleY += paddleSpeed;
+  if (keys["ArrowLeft"] && rightPaddleX > canvas.width / 2) rightPaddleX -= paddleSpeed;
+  if (keys["ArrowRight"] && rightPaddleX < canvas.width - paddleWidth) rightPaddleX += paddleSpeed;
+
+  if (spawning) {
+    spawnTimer--;
+    if (spawnTimer <= 0) {
+      launchPuck();
+    }
+  } else {
+    puckSpeedTime++;
+    let speedMultiplier = Math.min(1 + puckSpeedTime / 600, maxSpeed / 2.5);
+    puckX += puckSpeedX * speedMultiplier;
+    puckY += puckSpeedY * speedMultiplier + puckSpin;
+
+    trail.push({x: puckX, y: puckY});
+    if (trail.length > 15) trail.shift();
+
+    // === 修正済み：壁との衝突処理 ===
+    if (puckY < puckRadius) {
+      puckY = puckRadius;
+      puckSpeedY *= -1;
+      puckSpin *= -0.5;
+    }
+    if (puckY > canvas.height - puckRadius) {
+      puckY = canvas.height - puckRadius;
+      puckSpeedY *= -1;
+      puckSpin *= -0.5;
+    }
+
+    if (
+      puckX - puckRadius < leftPaddleX + paddleWidth &&
+      puckX + puckRadius > leftPaddleX &&
+      puckY > leftPaddleY && puckY < leftPaddleY + paddleHeight
+    ) {
+      let relativeY = puckY - (leftPaddleY + paddleHeight / 2);
+      puckSpeedY = relativeY * 0.2;
+      puckSpin = relativeY * 0.05;
+      puckSpeedX = Math.abs(puckSpeedX);
+    }
+    if (
+      puckX + puckRadius > rightPaddleX &&
+      puckX - puckRadius < rightPaddleX + paddleWidth &&
+      puckY > rightPaddleY && puckY < rightPaddleY + paddleHeight
+    ) {
+      let relativeY = puckY - (rightPaddleY + paddleHeight / 2);
+      puckSpeedY = relativeY * 0.2;
+      puckSpin = relativeY * 0.05;
+      puckSpeedX = -Math.abs(puckSpeedX);
+    }
+
+    if (puckX < 0) {
+      rightScore++;
+      updateScoreDisplay();
+      showGoalAnimation();
+      spawnPuck();
+    }
+    if (puckX > canvas.width) {
+      leftScore++;
+      updateScoreDisplay();
+      showGoalAnimation();
+      spawnPuck();
+    }
+  }
+
+  draw();
+  animationId = requestAnimationFrame(gameLoop);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#003366";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "white";
+  ctx.setLineDash([10, 15]);
+  ctx.beginPath();
+  ctx.moveTo(canvas.width / 2, 0);
+  ctx.lineTo(canvas.width / 2, canvas.height);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = "lightblue";
+  ctx.fillRect(leftPaddleX, leftPaddleY, paddleWidth, paddleHeight);
+  ctx.fillStyle = "orange";
+  ctx.fillRect(rightPaddleX, rightPaddleY, paddleWidth, paddleHeight);
+
+  for (let i = 0; i < trail.length; i++) {
+    const alpha = i / trail.length;
+    ctx.fillStyle = `rgba(255,255,255,${alpha * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(trail[i].x, trail[i].y, puckRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "white";
+  ctx.beginPath();
+  ctx.arc(puckX, puckY, puckRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function restartGame() {
+  document.getElementById("resultScreen").style.display = "none";
+  reset();
+  gameLoop();
+}
+
+function goBack() {
+  cancelAnimationFrame(animationId);
+  canvas.style.display = "none";
+  document.getElementById("scoreboard").style.display = "none";
+  document.getElementById("menu").style.display = "block";
+  document.getElementById("resultScreen").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+  document.getElementById("backBtn").style.display = "none";
+}
+
+function resetScores() {
+  leftScore = rightScore = 0;
+  updateScoreDisplay();
+}
+
+window.addEventListener("keydown", e => keys[e.code] = true);
+window.addEventListener("keyup", e => keys[e.code] = false);
+
+</script>
+
+</body>
+</html>
