@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>あら矢だ！避けナイト！【究極の二段構え】</title>
+    <style>
+        body { background-color: #1a1a1a; color: white; text-align: center; font-family: "Meiryo", sans-serif; overflow: hidden; margin: 0; }
+        #gameContainer { position: relative; width: 800px; margin: 10px auto; }
+        canvas { background-color: #222; border: 4px solid #f0ad4e; display: block; border-radius: 5px; }
+        .ui { font-size: 20px; margin-bottom: 5px; font-weight: bold; background: #333; padding: 10px; }
+        .hl { color: #ffeb3b; }
+        #message { position: absolute; top: 20px; width: 100%; text-align: center; color: #00ffcc; font-size: 2em; font-weight: bold; pointer-events: none; text-shadow: 2px 2px 4px #000; }
+        #ranking { position: absolute; top: 100px; width: 100%; text-align: center; display: none; background: rgba(0,0,0,0.8); padding: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        STAGE: <span id="stageNum" style="color:#00ffcc;">1</span> | 
+        HP: <span id="hpDisplay" style="color: #ff4444;">200</span> | 
+        SCORE: <span id="scoreDisplay">0</span><br>
+        <span class="hl">A</span>: <span id="healDisplay">1</span> | 
+        <span class="hl">D</span>: <span id="clearDisplay">3</span>
+    </div>
+    
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div id="message"></div>
+        <div id="ranking">
+            <h2 style="color: gold;">🏆 RANKING 🏆</h2>
+            <div id="rankingList"></div>
+            <p>F5キーでリトライ</p>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const hpDisplay = document.getElementById("hpDisplay");
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const stageNumDisplay = document.getElementById("stageNum");
+    const healDisplay = document.getElementById("healDisplay");
+    const clearDisplay = document.getElementById("clearDisplay");
+    const messageDisplay = document.getElementById("message");
+    const rankingDiv = document.getElementById("ranking");
+
+    // 設定
+    let player = { x: 400, y: 450, size: 18, hp: 200, speed: 2 };
+    const ARENA_CENTER = { x: 400, y: 500 };
+    const ARENA_RADIUS = 400; // 半円の半径
+
+    let enemies = [
+        { x: 100, y: 50, tx: 100, ty: 50, lastShot: 0 },
+        { x: 400, y: 80, tx: 400, ty: 80, lastShot: 0 },
+        { x: 700, y: 50, tx: 700, ty: 50, lastShot: 0 }
+    ];
+
+    let arrows = [];
+    let bombs = [];
+    let particles = [];
+    let skills = { heal: 1, clear: 3 };
+    let keys = {};
+    let gameOver = false;
+    let startTime = Date.now();
+    let currentScore = 0;
+
+    // ステージ管理
+    let gameClock = 0; // 開始からの秒数
+    let stageState = "STAGE1"; // STAGE1, WAIT1, STAGE2, WAIT2
+
+    window.addEventListener("keydown", (e) => {
+        keys[e.code] = true;
+        if (!gameOver) {
+            if (e.code === "KeyA" && skills.heal > 0) {
+                player.hp = 200; skills.heal--;
+                showMessage("あら矢だ！ 命びろい！");
+                createHealEffect(player.x + 9, player.y + 9);
+            }
+            if (e.code === "KeyD" && skills.clear > 0) {
+                arrows = []; bombs = []; skills.clear--;
+                showMessage("避けナイト！ 嵐の守護！");
+                createClearEffect();
+            }
+        }
+    });
+    window.addEventListener("keyup", (e) => keys[e.code] = false);
+
+    function showMessage(txt) {
+        messageDisplay.innerText = txt;
+        setTimeout(() => { if(messageDisplay.innerText === txt) messageDisplay.innerText = ""; }, 1800);
+    }
+
+    // パーティクル：黄色の花火
+    function createHealEffect(x, y) {
+        for (let i = 0; i < 50; i++) {
+            particles.push({ x, y, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, size: Math.random()*5+2, color: '#ffff00', alpha: 1, decay: 0.02 });
+        }
+    }
+
+    // パーティクル：緑の風
+    function createClearEffect() {
+        for (let i = 0; i < 80; i++) {
+            particles.push({ x: Math.random()*canvas.width, y: 500, vx: (Math.random()-0.5)*4, vy: -(Math.random()*8+4), size: Math.random()*4+2, color: '#00ff44', alpha: 0.8, decay: 0.01 });
+        }
+    }
+
+    function update() {
+        if (gameOver) return;
+
+        let now = Date.now();
+        gameClock = (now - startTime) / 1000;
+        currentScore = Math.floor(gameClock * 5);
+        scoreDisplay.innerText = currentScore;
+
+        // ステージループ管理
+        let cycleTime = gameClock % 49; // 23 + 3 + 20 + 3 = 49秒周期
+        if (cycleTime < 23) {
+            if(stageState !== "STAGE1") { stageState = "STAGE1"; showMessage("Stage 1: 矢の雨"); }
+        } else if (cycleTime < 26) {
+            if(stageState !== "WAIT1") { stageState = "WAIT1"; showMessage("Break..."); }
+        } else if (cycleTime < 46) {
+            if(stageState !== "STAGE2") { stageState = "STAGE2"; showMessage("Stage 2: 爆ぜる矢"); }
+        } else {
+            if(stageState !== "WAIT2") { stageState = "WAIT2"; showMessage("Break..."); }
+        }
+        stageNumDisplay.innerText = stageState.includes("1") ? "1" : "2";
+
+        // プレイヤー移動制限 (円形)
+        let nextX = player.x;
+        let nextY = player.y;
+        if (keys["ArrowUp"]) nextY -= player.speed;
+        if (keys["ArrowDown"]) nextY += player.speed;
+        if (keys["ArrowLeft"]) nextX -= player.speed;
+        if (keys["ArrowRight"]) nextX += player.speed;
+
+        // 円の境界チェック: (x-cx)^2 + (y-cy)^2 <= r^2
+        let dist = Math.sqrt(Math.pow(nextX + 9 - ARENA_CENTER.x, 2) + Math.pow(nextY + 9 - ARENA_CENTER.y, 2));
+        if (dist < ARENA_RADIUS - 10 && nextY < 480) {
+            player.x = nextX;
+            player.y = nextY;
+        }
+
+        // 敵の挙動
+        enemies.forEach(en => {
+            if (Math.abs(en.x - en.tx) < 5 && Math.abs(en.y - en.ty) < 5) {
+                // プレイヤーの円の「外」に目的地を設定
+                en.tx = Math.random() * 760 + 20;
+                en.ty = Math.random() * 100 + 20;
+            }
+            en.x += (en.tx - en.x) * 0.02;
+            en.y += (en.ty - en.y) * 0.02;
+
+            // ステージ1の攻撃
+            if (stageState === "STAGE1" && now - en.lastShot > 1250) {
+                for(let i=0; i<9; i++) {
+                    arrows.push({ x: en.x, y: en.y, vx: (Math.random()-0.5)*2, vy: 1 + Math.random(), type: 'normal' });
+                }
+                en.lastShot = now;
+            }
+            // ステージ2の攻撃
+            if (stageState === "STAGE2" && now - en.lastShot > 3600) {
+                // プレイヤーの円の少し内側のランダムな場所に投げる
+                let angle = Math.random() * Math.PI + Math.PI; // 上半分
+                let r = Math.random() * (ARENA_RADIUS - 50);
+                bombs.push({
+                    x: en.x, y: en.y,
+                    targetX: ARENA_CENTER.x + Math.cos(angle) * r,
+                    targetY: ARENA_CENTER.y + Math.sin(angle) * r,
+                    progress: 0,
+                    blinkCount: 0,
+                    lastBlink: 0,
+                    state: 'flying'
+                });
+                en.lastShot = now;
+            }
+        });
+
+        // 爆弾の更新
+        for (let i = bombs.length - 1; i >= 0; i--) {
+            let b = bombs[i];
+            if (b.state === 'flying') {
+                b.x += (b.targetX - b.x) * 0.05;
+                b.y += (b.targetY - b.y) * 0.05;
+                if (Math.abs(b.x - b.targetX) < 2) b.state = 'blinking';
+            } else if (b.state === 'blinking') {
+                if (now - b.lastBlink > 400) {
+                    b.blinkCount++;
+                    b.lastBlink = now;
+                    if (b.blinkCount >= 6) { // 3回点滅(ON/OFF計6回)
+                        // 爆発！
+                        for (let j = 0; j < 24; j++) {
+                            let ang = (Math.PI * 2 / 24) * j;
+                            arrows.push({ x: b.x, y: b.y, vx: Math.cos(ang) * 1.5, vy: Math.sin(ang) * 1.5, type: 'bomb' });
+                        }
+                        bombs.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // 矢の更新
+        for (let i = arrows.length - 1; i >= 0; i--) {
+            let a = arrows[i];
+            a.x += a.vx; a.y += a.vy;
+            if (a.x < player.x+18 && a.x+4 > player.x && a.y < player.y+18 && a.y+10 > player.y) {
+                player.hp -= 50; arrows.splice(i, 1);
+                if (player.hp <= 0) handleGameOver();
+                continue;
+            }
+            if (a.y > 550 || a.y < -50 || a.x < -50 || a.x > 850) arrows.splice(i, 1);
+        }
+
+        // パーティクル更新
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+            if (p.alpha <= 0) particles.splice(i, 1);
+        }
+
+        hpDisplay.innerText = player.hp;
+        healDisplay.innerText = skills.heal;
+        clearDisplay.innerText = skills.clear;
+    }
+
+    function handleGameOver() {
+        gameOver = true;
+        player.hp = 0;
+        hpDisplay.innerText = 0;
+        
+        // ランキング処理
+        let scores = JSON.parse(localStorage.getItem('bow_ranking') || "[]");
+        scores.push(currentScore);
+        scores.sort((a, b) => b - a);
+        scores = scores.slice(0, 5);
+        localStorage.setItem('bow_ranking', JSON.stringify(scores));
+
+        // ランキング表示
+        let listHtml = scores.map((s, i) => `<p>${i+1}位: ${s} pts</p>`).join("");
+        document.getElementById("rankingList").innerHTML = listHtml;
+        rankingDiv.style.display = "block";
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 移動範囲の描画
+        ctx.beginPath();
+        ctx.arc(ARENA_CENTER.x, ARENA_CENTER.y, ARENA_RADIUS, Math.PI, 0);
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.stroke();
+
+        // 敵
+        ctx.fillStyle = "#ff5555";
+        enemies.forEach(en => {
+            ctx.beginPath(); ctx.arc(en.x, en.y, 18, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = "white"; ctx.stroke();
+        });
+
+        // 爆弾
+        bombs.forEach(b => {
+            ctx.fillStyle = (b.state === 'blinking' && Math.floor(Date.now()/200) % 2 === 0) ? "white" : "red";
+            ctx.beginPath(); ctx.arc(b.x, b.y, 10, 0, Math.PI*2); ctx.fill();
+        });
+
+        // 矢
+        ctx.fillStyle = "#ffff00";
+        arrows.forEach(a => {
+            ctx.save(); ctx.translate(a.x, a.y);
+            ctx.rotate(Math.atan2(a.vy, a.vx) - Math.PI/2);
+            ctx.fillRect(-2, 0, 4, 12); ctx.restore();
+        });
+
+        // パーティクル
+        particles.forEach(p => {
+            ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+
+        // プレイヤー
+        ctx.fillStyle = "#3399ff";
+        ctx.shadowBlur = 10; ctx.shadowColor = "#3399ff";
+        ctx.fillRect(player.x, player.y, player.size, player.size);
+        ctx.shadowBlur = 0;
+
+        requestAnimationFrame(() => { update(); draw(); });
+    }
+
+    draw();
+</script>
+</body>
+</html>

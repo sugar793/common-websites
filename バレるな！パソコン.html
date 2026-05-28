@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>先生が振り向いたらパソコンを閉じるゲーム</title>
+
+  <style>
+    :root{
+      --bg:#071126;
+      --panel:#0e2535;
+      --accent:#ffd166;
+      --danger:#ff6b6b;
+      --muted:#9aa7bf
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans JP',sans-serif;
+      color:#e6eef8;
+      background:linear-gradient(180deg,#041021 0%, #071126 100%)
+    }
+
+    .wrap{
+      max-width:980px;
+      margin:22px auto;
+      padding:18px;
+      background:rgba(255,255,255,0.02);
+      border-radius:12px;
+      box-shadow:0 6px 30px rgba(2,8,23,0.6)
+    }
+
+    h1{
+      margin:0 0 8px;
+      font-size:20px
+    }
+
+    .top-row{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between
+    }
+
+    .board{
+      display:flex;
+      gap:20px;
+      align-items:flex-start;
+      padding:18px
+    }
+
+    .teacher{
+      width:300px;
+      height:380px;
+      border-radius:10px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+      background:linear-gradient(180deg,#071026,#0b1626);
+      box-shadow:inset 0 6px 20px rgba(255,255,255,0.02);
+      padding:12px
+    }
+
+    .figure{
+      font-size:120px;
+      user-select:none
+    }
+
+    .face{
+      margin-top:8px;
+      text-align:center;
+      font-size:20px
+    }
+
+    .status{
+      padding:12px;
+      background:rgba(255,255,255,0.02);
+      border-radius:8px;
+      min-width:600px
+    }
+
+    .big{
+      font-size:34px;
+      font-weight:700
+    }
+
+    .muted{
+      color:var(--muted)
+    }
+
+    .controls{
+      display:flex;
+      gap:8px;
+      margin-top:12px
+    }
+
+    button{
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,0.03);
+      color:inherit;
+      padding:8px 12px;
+      border-radius:8px;
+      cursor:pointer
+    }
+
+    button.primary{
+      background:var(--accent);
+      color:#032033;
+      font-weight:700
+    }
+
+    .laptop-wrap{
+      width:220px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:10px
+    }
+
+    .laptop-svg{
+      width:220px;
+      height:140px
+    }
+
+    .led{
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      background:#082733
+    }
+
+    .meter{
+      height:10px;
+      background:rgba(255,255,255,0.03);
+      border-radius:6px;
+      margin-top:8px;
+      overflow:hidden
+    }
+
+    .meter > i{
+      display:block;
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg,var(--accent),#ffd6a5)
+    }
+
+    .game-over{
+      padding:12px;
+      margin-top:12px;
+      border-radius:8px;
+      background:linear-gradient(180deg,rgba(255,60,60,0.08),rgba(255,60,60,0.02));
+      color:var(--danger);
+      font-weight:700
+    }
+
+    .hint{
+      font-size:13px;
+      color:var(--muted);
+      margin-top:8px
+    }
+
+    .footer{
+      margin-top:12px;
+      font-size:13px;
+      color:var(--muted)
+    }
+
+    @media (max-width:960px){
+      .board{
+        flex-direction:column;
+        align-items:center
+      }
+
+      .teacher{
+        width:260px;
+        height:320px
+      }
+
+      .status{
+        min-width:unset;
+        width:100%
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="top-row">
+    <h1>先生が振り向いたら閉じるゲーム</h1>
+    <div class="muted">操作: クリック / Space でノートPC開閉</div>
+  </div>
+
+  <div class="board">
+
+    <div class="teacher" id="teacher">
+      <div class="figure" id="figure">🧑‍🏫</div>
+      <div class="face" id="face">書いている</div>
+    </div>
+
+    <div class="status">
+
+      <div>
+        経過時間:
+        <span id="time" class="big">0.00</span>s
+      </div>
+
+      <div style="margin-top:8px">
+        状態:
+        <span id="state" class="muted">待機中</span>
+      </div>
+
+      <div style="margin-top:8px">
+        ノートPC開放合計:
+        <span id="openTime" class="big">0.00</span>s
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:12px;align-items:center">
+
+        <div class="laptop-wrap">
+
+          <svg class="laptop-svg" id="laptopSVG" viewBox="0 0 220 140">
+
+            <rect x="6" y="86" width="208" height="10" rx="4"
+                  fill="#071a26" stroke="#15323f" stroke-width="2"/>
+
+            <rect id="baseBody" x="8" y="60" width="204" height="40" rx="6"
+                  fill="#0b2b3a" stroke="#12333f" stroke-width="2"/>
+
+            <g id="closedGroup">
+              <rect x="20" y="22" width="180" height="36" rx="4"
+                    fill="#071a26" stroke="#12333f" stroke-width="2"/>
+              <text x="110" y="46" font-size="12"
+                    text-anchor="middle" fill="#9fd6e3">
+                閉じてる
+              </text>
+            </g>
+
+            <g id="openGroup" style="display:none;">
+              <rect x="12" y="6" width="196" height="52" rx="6"
+                    fill="#093544" stroke="#0f4b57" stroke-width="2"/>
+
+              <rect x="20" y="16" width="176" height="32" rx="4"
+                    fill="#071a26"/>
+
+              <text x="110" y="36" font-size="12"
+                    text-anchor="middle" fill="#bfeef7">
+                開いてる（作業中）
+              </text>
+            </g>
+
+          </svg>
+
+          <div class="led" id="led"></div>
+
+        </div>
+
+        <div style="flex:1">
+
+          <div class="meter">
+            <i id="gauge"></i>
+          </div>
+
+          <div class="hint">
+            ルール: 20秒間でどれだけPCを開けるか挑戦！
+            先生が見てるときに開いてたらOUT。
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="controls">
+        <button id="toggle">開く / 閉じる (Space)</button>
+        <button class="primary" id="start">スタート（enter）</button>
+        <button id="restart">始めから</button>
+      </div>
+
+      <div id="message"
+           class="game-over"
+           style="display:none;margin-top:10px"></div>
+
+      <div style="margin-top:14px">
+        <div style="font-weight:700;margin-bottom:6px">
+          ランキング TOP5
+        </div>
+
+        <ol id="rankingList"
+            style="margin:0;padding-left:22px;color:#ffd166">
+        </ol>
+      </div>
+
+      <div class="footer">
+        難易度:
+        先生が振り向いてから0.3秒の猶予がある。
+        時間が経つと先生の振り向きが早くなる。
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+
+const GRACE=0.3;
+const BASE_WRITE_MIN=1.2;
+const BASE_WRITE_MAX=3.0;
+const LOOK_MIN=0.8;
+const LOOK_MAX=2.0;
+
+const figure=document.getElementById('figure');
+const face=document.getElementById('face');
+const stateEl=document.getElementById('state');
+const timeEl=document.getElementById('time');
+const openTimeEl=document.getElementById('openTime');
+const gauge=document.getElementById('gauge');
+const message=document.getElementById('message');
+const toggleBtn=document.getElementById('toggle');
+const startBtn=document.getElementById('start');
+const restartBtn=document.getElementById('restart');
+const closedGroup=document.getElementById('closedGroup');
+const openGroup=document.getElementById('openGroup');
+const led=document.getElementById('led');
+const rankingList=document.getElementById('rankingList');
+
+let laptopOpen=false;
+let running=false;
+let startTime=0;
+let elapsed=0;
+let lastTick=0;
+let teacherState='writing';
+let nextSwitchAt=0;
+let lookStartTime=0;
+let writeStartTime=0;
+let out=false;
+let openAccum=0;
+let lastOpenTime=0;
+let rankings=[];
+
+function rand(a,b){
+  return Math.random()*(b-a)+a;
+}
+
+function setLaptop(open){
+
+  laptopOpen=open;
+
+  if(open){
+
+    openGroup.style.display='block';
+    closedGroup.style.display='none';
+    led.style.background='var(--accent)';
+    lastOpenTime=performance.now();
+
+  }else{
+
+    openGroup.style.display='none';
+    closedGroup.style.display='block';
+    led.style.background='#082733';
+
+    if(lastOpenTime){
+      openAccum+=(performance.now()-lastOpenTime)/1000;
+      lastOpenTime=0;
+    }
+
+    openTimeEl.textContent=openAccum.toFixed(2);
+  }
+}
+
+function difficultyFactor(t){
+  return Math.min(1,t/20);
+}
+
+function scheduleNextSwitch(){
+
+  const f=difficultyFactor(elapsed);
+
+  const wmin=BASE_WRITE_MIN*(1-0.6*f);
+  const wmax=BASE_WRITE_MAX*(1-0.6*f);
+
+  const lmin=LOOK_MIN*(1-0.4*f);
+  const lmax=LOOK_MAX*(1-0.4*f);
+
+  nextSwitchAt=
+    performance.now()+
+    rand(
+      teacherState==='writing'?wmin:lmin,
+      teacherState==='writing'?wmax:lmax
+    )*1000;
+}
+
+function flipTo(s){
+
+  teacherState=s;
+
+  if(s==='writing'){
+
+    figure.textContent='🧑‍🏫';
+    face.textContent='書いている';
+    stateEl.textContent='先生は前を向いていません';
+    writeStartTime=performance.now();
+
+  }else{
+
+    figure.textContent='👀';
+    face.textContent='振り向いた！';
+    stateEl.textContent='先生がこっちを見ている！';
+    lookStartTime=performance.now();
+  }
+
+  scheduleNextSwitch();
+}
+
+function updateRanking(score){
+
+  rankings.push(score);
+
+  rankings.sort((a,b)=>b-a);
+
+  rankings=rankings.slice(0,5);
+
+  rankingList.innerHTML='';
+
+  rankings.forEach((s)=>{
+
+    const li=document.createElement('li');
+
+    li.textContent=`${s.toFixed(2)} 秒`;
+
+    rankingList.appendChild(li);
+  });
+}
+
+function gameOver(r){
+
+  running=false;
+  out=true;
+
+  if(laptopOpen){
+    openAccum+=(performance.now()-lastOpenTime)/1000;
+  }
+
+  updateRanking(openAccum);
+
+  message.style.display='block';
+
+  message.textContent=
+    `OUT！ ${r} — 生存 ${elapsed.toFixed(2)}s / 開放 ${openAccum.toFixed(2)}s`;
+
+  stateEl.textContent='ゲームオーバー';
+}
+
+function finish20s(){
+
+  running=false;
+
+  if(laptopOpen){
+    openAccum+=(performance.now()-lastOpenTime)/1000;
+  }
+
+  updateRanking(openAccum);
+
+  message.style.display='block';
+
+  message.textContent=
+    `🎉 終了！ 20秒生存達成 — 開放 ${openAccum.toFixed(2)}s`;
+
+  stateEl.textContent='クリア';
+}
+
+function restart(){
+
+  running=false;
+  out=false;
+  elapsed=0;
+  openAccum=0;
+  lastOpenTime=0;
+
+  message.style.display='none';
+
+  setLaptop(false);
+
+  teacherState='writing';
+
+  timeEl.textContent='0.00';
+  openTimeEl.textContent='0.00';
+
+  gauge.style.width='0%';
+
+  stateEl.textContent='待機中';
+}
+
+function start(){
+
+  restart();
+
+  running=true;
+
+  startTime=performance.now();
+  lastTick=startTime;
+
+  writeStartTime=performance.now();
+
+  flipTo('writing');
+
+  scheduleNextSwitch();
+
+  requestAnimationFrame(tick);
+}
+
+function tick(now){
+
+  if(!running)return;
+
+  const dt=(now-lastTick)/1000;
+
+  lastTick=now;
+
+  elapsed=(now-startTime)/1000;
+
+  timeEl.textContent=elapsed.toFixed(2);
+
+  if(laptopOpen){
+
+    openTimeEl.textContent=
+      (
+        openAccum+
+        ((now-lastOpenTime)/1000)
+      ).toFixed(2);
+  }
+
+  gauge.style.width=
+    Math.min(100,elapsed/20*100)+'%';
+
+  if(now>=nextSwitchAt){
+
+    flipTo(
+      teacherState==='writing'
+      ?'looking'
+      :'writing'
+    );
+  }
+
+  if(teacherState==='looking'){
+
+    const sinceLook=
+      (now-lookStartTime)/1000;
+
+    if(laptopOpen&&sinceLook>GRACE){
+
+      gameOver('先生に見つかった');
+
+      return;
+    }
+  }
+
+  if(elapsed>=20){
+
+    finish20s();
+
+    return;
+  }
+
+  requestAnimationFrame(tick);
+}
+
+toggleBtn.onclick=()=>{
+
+  if(out)return;
+
+  setLaptop(!laptopOpen);
+};
+
+startBtn.onclick=()=>{
+
+  if(!running)start();
+};
+
+restartBtn.onclick=()=>{
+
+  restart();
+};
+
+window.onkeydown=(e)=>{
+
+  if(e.code==='Space'){
+
+    e.preventDefault();
+
+    if(out)return;
+
+    setLaptop(!laptopOpen);
+  }
+
+  if(e.code==='Enter'&&!running){
+
+    start();
+  }
+};
+
+restart();
+
+</script>
+
+</body>
+</html>

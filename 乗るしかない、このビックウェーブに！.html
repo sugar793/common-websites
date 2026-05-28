@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>乗るしかない、このビッグウェーブに！</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #001f3f; font-family: 'Hiragino Kaku Gothic ProN', sans-serif; }
+        canvas { display: block; }
+        #ui {
+            position: absolute; top: 20px; left: 20px; color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); pointer-events: none;
+        }
+        .stat { font-size: 20px; margin-bottom: 5px; }
+        #speed-val { font-size: 32px; color: #00ffcc; }
+        #target-info { color: #ffeb3b; font-weight: bold; border: 1px solid #ffeb3b; padding: 5px; display: inline-block; margin-top: 5px; }
+        #feedback {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 48px; font-weight: bold; pointer-events: none;
+        }
+        #msg-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: white; display: none;
+        }
+        .btn-restart {
+            padding: 15px 30px; font-size: 20px; cursor: pointer; background: #ff4500;
+            border: none; color: white; border-radius: 10px; margin-top: 20px;
+        }
+        #ranking-list {
+            margin-top: 20px; text-align: left; background: rgba(255,255,255,0.1);
+            padding: 15px; border-radius: 10px; min-width: 250px;
+        }
+        .ranking-item { border-bottom: 1px solid #555; padding: 5px 0; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div class="stat">残り距離: <span id="dist">60000</span>m</div>
+    <div class="stat">タイム: <span id="timer">0.00</span>s</div>
+    <div class="stat">速度: <span id="speed-val">0</span> km/h</div>
+    <div id="target-info">目標登校時間: 27.00秒以内</div>
+    <div style="margin-top:10px; color:#ddd;">[Space] 下りで加速 / 上りで減速</div>
+</div>
+
+<div id="feedback"></div>
+
+<div id="msg-screen">
+    <h1 id="result-title"></h1>
+    <p id="result-score" style="font-size: 24px;"></p>
+    
+    <div id="ranking-list">
+        <h3 style="text-align: center; margin-top: 0;">🏆 歴代TOP5 (秒)</h3>
+        <div id="ranking-items"></div>
+    </div>
+
+    <button class="btn-restart" onclick="location.reload()">もう一度波に乗る</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const feedbackEl = document.getElementById('feedback');
+const distEl = document.getElementById('dist');
+const timerEl = document.getElementById('timer');
+const speedEl = document.getElementById('speed-val');
+
+let width, height;
+let isPressing = false;
+let isGameOver = false;
+let startTime = Date.now();
+
+let player = {
+    x: 150,
+    y: 0,
+    speed: 10,
+    totalDist: 0,
+    visualY: 0
+};
+
+// 指定された条件
+const GOAL_DIST = 60000; 
+const TIME_LIMIT = 27;
+
+function init() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    player.visualY = height / 2;
+}
+
+function getWaveY(x) {
+    const baseLine = height * 0.6;
+    const wave1 = Math.sin(x * 0.005) * 60;
+    const wave2 = Math.sin(x * 0.012) * 30;
+    const wave3 = Math.sin(x * 0.002) * 100;
+    return baseLine + wave1 + wave2 + wave3;
+}
+
+window.addEventListener('keydown', (e) => { if(e.code === 'Space') isPressing = true; });
+window.addEventListener('keyup', (e) => { if(e.code === 'Space') isPressing = false; });
+window.addEventListener('mousedown', () => isPressing = true);
+window.addEventListener('mouseup', () => isPressing = false);
+
+function update() {
+    if (isGameOver) return;
+
+    let elapsed = (Date.now() - startTime) / 1000;
+    timerEl.innerText = elapsed.toFixed(2);
+
+    let currentWaveY = getWaveY(player.x + player.totalDist);
+    let nextWaveY = getWaveY(player.x + player.totalDist + 5);
+    let slope = nextWaveY - currentWaveY;
+
+    if (isPressing) {
+        if (slope > 0.1) {
+            player.speed += slope * 1.5;
+            showFeedback("PERFECT!", "#00ffcc");
+        } else if (slope < -0.1) {
+            player.speed += slope * 2.0; 
+            showFeedback("BAD...", "#ff4500");
+        }
+    } else {
+        feedbackEl.innerText = "";
+    }
+
+    player.speed *= 0.995;
+    if (player.speed < 5) player.speed = 5;
+
+    player.totalDist += player.speed;
+    player.visualY = currentWaveY;
+
+    let remaining = Math.max(0, GOAL_DIST - player.totalDist);
+    distEl.innerText = Math.floor(remaining);
+    speedEl.innerText = Math.floor(player.speed * 5);
+
+    if (remaining <= 0) {
+        endGame(elapsed);
+    }
+}
+
+function showFeedback(text, color) {
+    feedbackEl.innerText = text;
+    feedbackEl.style.color = color;
+}
+
+function saveScore(newTime) {
+    let scores = JSON.parse(localStorage.getItem('bigwave_scores_60k')) || [];
+    scores.push(parseFloat(newTime.toFixed(2)));
+    scores.sort((a, b) => a - b);
+    scores = scores.slice(0, 5);
+    localStorage.setItem('bigwave_scores_60k', JSON.stringify(scores));
+    return scores;
+}
+
+function displayRankings(scores) {
+    const container = document.getElementById('ranking-items');
+    container.innerHTML = scores.map((s, i) => `
+        <div class="ranking-item">
+            <span>${i + 1}位</span>
+            <span>${s}秒</span>
+        </div>
+    `).join('');
+}
+
+function endGame(finalTime) {
+    isGameOver = true;
+    const screen = document.getElementById('msg-screen');
+    const title = document.getElementById('result-title');
+    const scoreText = document.getElementById('result-score');
+
+    const scores = saveScore(finalTime);
+    displayRankings(scores);
+
+    screen.style.display = 'flex';
+    if (finalTime <= TIME_LIMIT) {
+        title.innerText = "遅刻回避！君こそがビッグウェーブだ";
+        title.style.color = "#00ffcc";
+    } else {
+        title.innerText = "遅刻... 波の乗り方が足りない！";
+        title.style.color = "#ff4500";
+    }
+    scoreText.innerText = `タイム: ${finalTime.toFixed(2)}秒`;
+}
+
+function draw() {
+    const grad = ctx.createLinearGradient(0, 0, 0, height);
+    grad.addColorStop(0, '#001f3f');
+    grad.addColorStop(1, '#0074D9');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.beginPath();
+    ctx.fillStyle = '#7FDBFF';
+    ctx.moveTo(0, height);
+    for (let x = 0; x <= width; x += 10) {
+        ctx.lineTo(x, getWaveY(x + player.totalDist));
+    }
+    ctx.lineTo(width, height);
+    ctx.fill();
+
+    ctx.save();
+    let slope = getWaveY(player.x + player.totalDist + 1) - getWaveY(player.x + player.totalDist);
+    ctx.translate(player.x, player.visualY - 10);
+    ctx.rotate(Math.atan2(slope, 1));
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 40, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = isPressing ? '#ffeb3b' : '#ff4136';
+    ctx.fillRect(-10, -35, 20, 35);
+    ctx.restore();
+
+    update();
+    requestAnimationFrame(draw);
+}
+
+window.addEventListener('resize', init);
+init();
+draw();
+</script>
+</body>
+</html>

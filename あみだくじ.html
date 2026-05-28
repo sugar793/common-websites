@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>人生あみだくじ</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #222, #111);
+      font-family: "Comic Sans MS", cursive;
+      color: #fff;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      text-align: center;
+    }
+
+    input, button {
+      padding: 8px;
+      font-size: 1em;
+      margin: 4px;
+      border-radius: 6px;
+      border: none;
+    }
+
+    button {
+      background-color: #ff0077;
+      color: white;
+      cursor: pointer;
+    }
+
+    #result {
+      margin-top: 10px;
+      font-size: 1.5em;
+      color: #0ff;
+      text-shadow: 1px 1px 3px #000;
+      background-color: rgba(0, 0, 0, 0.6);
+      padding: 10px 20px;
+      border-radius: 12px;
+      display: inline-block;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>人生あみだくじ</h1>
+    <input type="text" id="playerName" placeholder="名前（なくてもOK）">
+    <button onclick="startGame()">運命スタート</button>
+    <div id="result"></div>
+  </div>
+  <canvas id="amidaCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("amidaCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let lines = 6;
+    let spacing, stepHeight;
+    const steps = 24;
+    let horizontalLines = [];
+    let occupiedY = new Set();
+    const outcomes = ["350", "0（名無し & 体調不良）", "460", "430", "410", "400"];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      spacing = canvas.width / (lines + 1);
+      stepHeight = canvas.height / (steps + 3); // 余裕をもって
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      drawAmida();
+    });
+
+    function getRandomY() {
+      let y;
+      let tries = 0;
+      do {
+        y = Math.floor(Math.random() * steps) * stepHeight + stepHeight;
+        tries++;
+        if (tries > 100) break;
+      } while (occupiedY.has(y));
+      occupiedY.add(y);
+      return y;
+    }
+
+    function drawTextWithBackground(text, x, y, fontSize = 20, padding = 4) {
+      ctx.font = `${fontSize}px sans-serif`;
+      const textWidth = ctx.measureText(text).width;
+      const boxWidth = textWidth + padding * 2;
+      const boxHeight = fontSize + padding * 2;
+
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(x - boxWidth / 2, y - boxHeight / 2, boxWidth, boxHeight);
+
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y);
+    }
+
+    function drawAmida() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      horizontalLines = [];
+      occupiedY = new Set();
+
+      // 縦線
+      for (let i = 0; i < lines; i++) {
+        ctx.beginPath();
+        ctx.moveTo(spacing * (i + 1), 0);
+        ctx.lineTo(spacing * (i + 1), canvas.height);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // 横線
+      for (let i = 0; i < steps - 1; i++) {
+        const y = getRandomY();
+        const from = Math.floor(Math.random() * (lines - 1));
+        horizontalLines.push({ from, y, used: false });
+
+        ctx.beginPath();
+        ctx.moveTo(spacing * (from + 1), y);
+        ctx.lineTo(spacing * (from + 2), y);
+        ctx.strokeStyle = "#0ff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // ゴール文字（背景つき、重ならず大きく）
+      for (let i = 0; i < lines; i++) {
+        const text = outcomes[i];
+        const x = spacing * (i + 1);
+        const y = canvas.height - stepHeight * 0.8;
+        drawTextWithBackground(text, x, y, Math.floor(stepHeight * 0.8));
+      }
+    }
+
+    function animate(startLine) {
+      let x = spacing * (startLine + 1);
+      let y = 0;
+      let currentLine = startLine;
+      const passedLines = new Set();
+
+      const interval = setInterval(() => {
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = "lime";
+        ctx.fill();
+
+        for (const h of horizontalLines) {
+          const key = `${h.from},${h.y}`;
+          if (Math.abs(h.y - y) < 5 && !passedLines.has(key)) {
+            if (h.from === currentLine) {
+              x += spacing;
+              currentLine++;
+              passedLines.add(key);
+              break;
+            } else if (h.from + 1 === currentLine) {
+              x -= spacing;
+              currentLine--;
+              passedLines.add(key);
+              break;
+            }
+          }
+        }
+
+        y += 6;
+
+        if (y > canvas.height) {
+          clearInterval(interval);
+          const resultText = outcomes[currentLine];
+          document.getElementById("result").innerHTML = `
+            <b>${document.getElementById("playerName").value || "あなた"}の未来：</b><br>
+            <span style="font-size:1.5em; color:#0ff">${resultText}</span>
+          `;
+        }
+      }, 50);
+    }
+
+    function startGame() {
+      resizeCanvas();
+      drawAmida();
+      const startLine = Math.floor(Math.random() * lines);
+      animate(startLine);
+    }
+
+    resizeCanvas();
+    drawAmida();
+  </script>
+</body>
+</html>

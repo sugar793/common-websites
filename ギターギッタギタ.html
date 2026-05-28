@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>街ごとギッタギタ・フェスティバル</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial Black', sans-serif;
+            background: var(--bg-color);
+            transition: background 1s;
+            user-select: none;
+        }
+
+        /* 街の背景 */
+        #city-layer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            z-index: 1;
+            transition: opacity 0.5s;
+        }
+        .building {
+            width: 80px;
+            background: #34495e;
+            border-top: 5px solid #2c3e50;
+            position: relative;
+        }
+        .window {
+            width: 10px;
+            height: 10px;
+            background: #f1c40f;
+            margin: 10px auto;
+            box-shadow: 0 0 5px #f1c40f;
+        }
+        .person {
+            font-size: 20px;
+            position: absolute;
+            bottom: 0;
+            transition: transform 0.2s;
+        }
+
+        /* ゲームメイン */
+        #game-stage {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #guitar-container {
+            width: 300px;
+            height: 400px;
+            cursor: pointer;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+        }
+
+        /* UI */
+        #ui-panel {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #fff;
+        }
+        .meter-box { text-align: center; color: #fff; width: 200px; }
+        .progress-bg { width: 100%; height: 20px; background: #333; border: 1px solid #fff; margin-top: 5px; overflow: hidden;}
+        .progress-fill { width: 0%; height: 100%; transition: width 0.1s; }
+        #guitar-fill { background: linear-gradient(90deg, #f39c12, #e74c3c); }
+        #city-fill { background: linear-gradient(90deg, #3498db, #9b59b6); }
+
+        /* エフェクト */
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            z-index: 50;
+        }
+        #flash {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; pointer-events: none; z-index: 1000;
+        }
+        .shake { animation: shake 0.1s infinite; }
+        @keyframes shake {
+            0% { transform: translate(3px, 3px) rotate(0deg); }
+            50% { transform: translate(-3px, -3px) rotate(-1deg); }
+            100% { transform: translate(3px, -3px) rotate(1deg); }
+        }
+    </style>
+</head>
+<body onclick="clickBackground(event)">
+
+    <div id="flash"></div>
+
+    <div id="ui-panel">
+        <div class="meter-box">
+            <div>GUITAR GITTA-GITA</div>
+            <div class="progress-bg"><div id="guitar-fill" class="progress-fill"></div></div>
+        </div>
+        <div class="meter-box">
+            <div>CITY DESTRUCTION</div>
+            <div class="progress-bg"><div id="city-fill" class="progress-fill"></div></div>
+        </div>
+    </div>
+
+    <div id="city-layer">
+        </div>
+
+    <div id="game-stage">
+        <div id="guitar-container" onclick="clickGuitar(event)">
+            <svg id="guitar-svg" viewBox="0 0 100 200" style="width:100%; height:100%;">
+                <path id="guitar-body" d="M50,180 C20,180 10,150 10,120 C10,90 30,80 30,60 L30,20 L70,20 L70,60 C70,80 90,90 90,120 C90,150 80,180 50,180 Z" fill="#8b4513" />
+                <rect x="44" y="20" width="12" height="60" fill="#3d2b1f" />
+                <g id="strings" stroke="#ccc" stroke-width="0.5">
+                    <line x1="46" y1="20" x2="46" y2="120" />
+                    <line x1="50" y1="20" x2="50" y2="120" />
+                    <line x1="54" y1="20" x2="54" y2="120" />
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        let guitarScore = 0;
+        let cityScore = 0;
+        let isGuitarDestroyed = false;
+        let isCityDestroyed = false;
+
+        const flash = document.getElementById('flash');
+        const cityLayer = document.getElementById('city-layer');
+
+        // 街の生成
+        function initCity() {
+            for (let i = 0; i < 15; i++) {
+                const b = document.createElement('div');
+                b.className = 'building';
+                b.style.height = (100 + Math.random() * 300) + 'px';
+                b.innerHTML = '<div class="window"></div>'.repeat(Math.floor(Math.random() * 5) + 1);
+                cityLayer.appendChild(b);
+                
+                const p = document.createElement('div');
+                p.className = 'person';
+                p.innerText = ['🏃', '💃', '🚶', '🧍'][Math.floor(Math.random()*4)];
+                p.style.left = (Math.random() * 100) + 'vw';
+                document.body.appendChild(p);
+            }
+        }
+        initCity();
+
+        // 音響効果
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(freq, type, duration) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        // パーティクル生成
+        function spawnParticles(x, y, count, colors, power = 1) {
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = (Math.random() * 10 + 5) * power;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.background = colors[Math.floor(Math.random() * colors.length)];
+                p.style.left = x + 'px';
+                p.style.top = y + 'px';
+                p.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                document.body.appendChild(p);
+
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = (Math.random() * 200 + 100) * power;
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity;
+
+                p.animate([
+                    { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) rotate(${Math.random() * 720}deg)`, opacity: 0 }
+                ], {
+                    duration: 1000 + Math.random() * 1000,
+                    easing: 'ease-out'
+                }).onfinish = () => p.remove();
+            }
+        }
+
+        // ギタークリック時
+        function clickGuitar(e) {
+            e.stopPropagation();
+            if (isGuitarDestroyed) return;
+
+            guitarScore += 2;
+            document.getElementById('guitar-fill').style.width = Math.min(guitarScore, 100) + '%';
+            
+            // 叩くたびに揺らす
+            const container = document.getElementById('guitar-container');
+            container.classList.add('shake');
+            setTimeout(() => container.classList.remove('shake'), 100);
+            
+            playSound(150 + Math.random() * 100, 'sawtooth', 0.1);
+            spawnParticles(e.clientX, e.clientY, 5, ['#8b4513', '#fff', '#333']);
+
+            if (guitarScore >= 100) {
+                isGuitarDestroyed = true;
+                explodeGuitar();
+            }
+        }
+
+        // 背景（街）クリック時
+        function clickBackground(e) {
+            if (isCityDestroyed) return;
+
+            cityScore += 2;
+            document.getElementById('city-fill').style.width = Math.min(cityScore, 100) + '%';
+            
+            // 街の住人を驚かせる
+            document.querySelectorAll('.person').forEach(p => {
+                p.style.transform = `translateY(-${20 + Math.random() * 30}px) rotate(${Math.random()*40-20}deg)`;
+                setTimeout(() => p.style.transform = 'translateY(0)', 200);
+            });
+
+            playSound(60, 'square', 0.2);
+            spawnParticles(e.clientX, e.clientY, 8, ['#34495e', '#f1c40f', '#95a5a6']);
+
+            if (cityScore >= 100) {
+                isCityDestroyed = true;
+                explodeEverything();
+            }
+        }
+
+        function explodeGuitar() {
+            const rect = document.getElementById('guitar-container').getBoundingClientRect();
+            playSound(100, 'brown', 0.5);
+            spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, 150, ['#8b4513', '#ff0000', '#000'], 2);
+            document.getElementById('guitar-container').style.display = 'none';
+        }
+
+        function explodeEverything() {
+            // 豪華演出：ホワイトアウト
+            flash.style.opacity = '1';
+            document.body.classList.add('shake');
+            
+            // 大爆発音
+            playSound(40, 'sawtooth', 2);
+            playSound(80, 'sawtooth', 1.5);
+
+            setTimeout(() => {
+                // 背景を黒に変え、全てを吹き飛ばす
+                document.documentElement.style.setProperty('--bg-color', '#000');
+                cityLayer.style.display = 'none';
+                document.querySelectorAll('.person').forEach(p => p.remove());
+                
+                // 画面全体から破片
+                for(let i=0; i<10; i++) {
+                    setTimeout(() => {
+                        spawnParticles(Math.random()*window.innerWidth, Math.random()*window.innerHeight, 50, ['#fff', '#333', '#555', '#2c3e50'], 4);
+                    }, i * 100);
+                }
+
+                flash.style.opacity = '0';
+                flash.style.transition = 'opacity 2s';
+                document.body.classList.remove('shake');
+                
+                const msg = document.createElement('div');
+                msg.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:white; font-size:3rem; text-align:center;';
+                msg.innerHTML = "THE WORLD WAS<br>GITTA-GITA";
+                document.body.appendChild(msg);
+            }, 500);
+        }
+    </script>
+</body>
+</html>
