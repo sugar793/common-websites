@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>アクションゲーム</title>
+  <style>
+    body { background: #000; margin: 0; font-family: sans-serif; color: white; }
+    #game {
+      width: 800px; height: 400px; margin: 20px auto;
+      position: relative; background: #222; border: 3px solid white;
+      overflow: hidden; transition: background 1s;
+    }
+    #player {
+      position: absolute; width: 40px; height: 40px;
+      background: blue; bottom: 60px; left: 100px;
+    }
+    .obstacle {
+      position: absolute; width: 30px; height: 30px;
+      background: red;
+    }
+    .platform {
+      position: absolute; width: 100px; height: 20px;
+      background: green;
+    }
+    .screen {
+      display: none; text-align: center; margin-top: 30px;
+    }
+    button {
+      padding: 10px 20px; font-size: 18px; margin-top: 20px;
+    }
+    #info {
+      text-align: center; font-size: 18px; margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- タイトル画面 -->
+<div id="titleScreen" class="screen">
+  <h1>アクションゲーム</h1>
+  <button onclick="startGame()">ゲーム開始</button>
+  <h2>ランキング</h2>
+  <ul id="ranking"></ul>
+</div>
+
+<!-- ゲーム画面 -->
+<div id="game">
+  <div id="player"></div>
+</div>
+<div id="info">
+  スコア: <span id="score">0</span>　
+  時間: <span id="time">0.0</span>秒
+</div>
+
+<!-- 結果画面 -->
+<div id="resultScreen" class="screen">
+  <h2>ゲームオーバー！</h2>
+  <p>スコア: <span id="finalScore">0</span></p>
+  <button onclick="returnToTitle()">タイトルに戻る</button>
+</div>
+
+<!-- 効果音 -->
+<audio id="jumpSound" src="https://cdn.jsdelivr.net/gh/saint12/sfx/jump.mp3"></audio>
+<audio id="overSound" src="https://cdn.jsdelivr.net/gh/saint12/sfx/gameover.mp3"></audio>
+
+<script>
+let playerX = 100, playerY = 60, velocityY = 0;
+let isJumping = false, score = 0, timeElapsed = 0;
+let obstacles = [], platforms = [], gameRunning = false;
+let fallSpeed = 3, spawnInterval = 1000, spawnTimer, loopFrame;
+
+const keys = { left: false, right: false };
+const game = document.getElementById("game");
+const player = document.getElementById("player");
+const scoreDisplay = document.getElementById("score");
+const timeDisplay = document.getElementById("time");
+const finalScoreDisplay = document.getElementById("finalScore");
+const jumpSound = document.getElementById("jumpSound");
+const overSound = document.getElementById("overSound");
+const titleScreen = document.getElementById("titleScreen");
+const resultScreen = document.getElementById("resultScreen");
+const rankingList = document.getElementById("ranking");
+const info = document.getElementById("info");
+
+document.addEventListener("keydown", (e) => {
+  if (!gameRunning) return;
+  if (e.key === "ArrowLeft") keys.left = true;
+  if (e.key === "ArrowRight") keys.right = true;
+  if (e.key === " " && !isJumping) {
+    velocityY = 15;
+    isJumping = true;
+    jumpSound.currentTime = 0;
+    jumpSound.play();
+  }
+});
+document.addEventListener("keyup", (e) => {
+  if (e.key === "ArrowLeft") keys.left = false;
+  if (e.key === "ArrowRight") keys.right = false;
+});
+
+function startGame() {
+  playerX = 100; playerY = 60; velocityY = 0;
+  isJumping = false; score = 0; timeElapsed = 0;
+  fallSpeed = 3; spawnInterval = 1000;
+  obstacles = []; platforms = [];
+  gameRunning = true;
+
+  titleScreen.style.display = "none";
+  resultScreen.style.display = "none";
+  info.style.display = "block";
+  game.style.display = "block";
+  scoreDisplay.textContent = "0";
+  timeDisplay.textContent = "0.0";
+
+  game.innerHTML = '<div id="player"></div>';
+  createPlatforms();
+
+  loopFrame = requestAnimationFrame(gameLoop);
+  spawnTimer = setInterval(spawnObstacle, spawnInterval);
+  timeCounter();
+}
+
+function createPlatforms() {
+  const positions = [100, 300, 500];
+  const heights = [60, 100, 80];
+  positions.forEach((x, i) => {
+    const plat = document.createElement("div");
+    plat.className = "platform";
+    plat.style.left = `${x}px`;
+    plat.style.bottom = `${heights[i]}px`;
+    game.appendChild(plat);
+    platforms.push({ el: plat, x, y: heights[i] });
+  });
+}
+
+function updatePlayer() {
+  if (keys.left) playerX -= 5;
+  if (keys.right) playerX += 5;
+  playerX = Math.max(0, Math.min(760, playerX));
+
+  velocityY -= 1;
+  playerY += velocityY;
+
+  let onPlatform = false;
+  for (const plat of platforms) {
+    if (
+      playerX + 40 > plat.x && playerX < plat.x + 100 &&
+      playerY <= plat.y + 5 && playerY >= plat.y - 10 &&
+      velocityY <= 0
+    ) {
+      playerY = plat.y; velocityY = 0;
+      isJumping = false; onPlatform = true;
+    }
+  }
+  if (!onPlatform && playerY < 0) {
+    playerY = 0; velocityY = 0;
+    isJumping = false;
+  }
+
+  const p = document.getElementById("player");
+  p.style.left = playerX + "px";
+  p.style.bottom = playerY + "px";
+}
+
+function spawnObstacle() {
+  const obs = document.createElement("div");
+  obs.className = "obstacle";
+
+  let types = ["normal"];
+  if (timeElapsed >= 10) types.push("fast");
+  if (timeElapsed >= 20) types.push("zigzag");
+
+  const type = types[Math.floor(Math.random() * types.length)];
+  let speed = fallSpeed + Math.random() * 2;
+  let x = Math.random() * 770;
+
+  if (type === "normal" || type === "fast") {
+    x = playerX + 10;
+  }
+
+  obs.style.left = x + "px";
+  obs.style.top = "0px";
+  if (type === "fast") {
+    obs.style.background = "orange"; speed += 2;
+  } else if (type === "zigzag") {
+    obs.style.background = "lime";
+  }
+
+  game.appendChild(obs);
+  obstacles.push({ el: obs, x, y: 0, speed, type, dir: 1 });
+}
+
+function updateObstacles() {
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const obs = obstacles[i];
+    if (obs.type === "zigzag") {
+      obs.x += obs.dir * 2;
+      if (obs.x < 0 || obs.x > 770) obs.dir *= -1;
+      obs.el.style.left = obs.x + "px";
+    }
+    obs.y += obs.speed;
+    obs.el.style.top = obs.y + "px";
+
+    const obsRect = obs.el.getBoundingClientRect();
+    const playerRect = document.getElementById("player").getBoundingClientRect();
+
+    if (
+      obsRect.bottom > playerRect.top &&
+      obsRect.top < playerRect.bottom &&
+      obsRect.right > playerRect.left &&
+      obsRect.left < playerRect.right
+    ) {
+      overSound.play(); endGame();
+    }
+
+    if (obs.y > 400) {
+      obs.el.remove();
+      obstacles.splice(i, 1);
+      score++;
+      scoreDisplay.textContent = score;
+
+      if (score % 5 === 0 && spawnInterval > 200) {
+        clearInterval(spawnTimer);
+        spawnInterval -= 100;
+        spawnTimer = setInterval(spawnObstacle, spawnInterval);
+      }
+    }
+  }
+}
+
+function gameLoop() {
+  if (!gameRunning) return;
+  updatePlayer();
+  updateObstacles();
+  loopFrame = requestAnimationFrame(gameLoop);
+}
+
+function timeCounter() {
+  const timer = setInterval(() => {
+    if (!gameRunning) return clearInterval(timer);
+    timeElapsed += 0.1;
+    timeDisplay.textContent = timeElapsed.toFixed(1);
+
+    if (timeElapsed > 10 && timeElapsed < 20) {
+      game.style.background = "#113377";
+    } else if (timeElapsed > 20) {
+      game.style.background = "#331144";
+    }
+  }, 100);
+}
+
+function endGame() {
+  gameRunning = false;
+  cancelAnimationFrame(loopFrame);
+  clearInterval(spawnTimer);
+  finalScoreDisplay.textContent = score;
+  info.style.display = "none";
+  resultScreen.style.display = "block";
+  saveRanking(score);
+}
+
+function returnToTitle() {
+  game.style.display = "none";
+  resultScreen.style.display = "none";
+  titleScreen.style.display = "block";
+  loadRanking();
+}
+
+function saveRanking(newScore) {
+  const rank = JSON.parse(localStorage.getItem("ranking") || "[]");
+  rank.push(newScore);
+  rank.sort((a, b) => b - a);
+  localStorage.setItem("ranking", JSON.stringify(rank.slice(0, 5)));
+}
+
+function loadRanking() {
+  const rank = JSON.parse(localStorage.getItem("ranking") || "[]");
+  rankingList.innerHTML = "";
+  rank.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.textContent = `${i + 1}位：${s}点`;
+    rankingList.appendChild(li);
+  });
+}
+
+loadRanking(); // 初回読み込み
+titleScreen.style.display = "block"; // ←これを追加
+</script>
+</body>
+</html>
