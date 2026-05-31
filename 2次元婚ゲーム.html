@@ -98,13 +98,13 @@
 <body>
 
     <h1>愛のディスタンス 〜2mの籍入りチャレンジ〜</h1>
-    <p>操作: 矢印キー or WASD。彼女から2m（ピンクの円）以上離れてはいけないぞ！</p>
+    <p>操作: 矢印キー or WASD。パートナーから2m（ピンクの円）以上離れてはいけないぞ！</p>
 
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="overlay" class="active">
             <div id="resultTitle">愛のディスタンス</div>
-            <div id="resultDesc">20秒間、彼女の【2m以内】をキープせよ！</div>
+            <div id="resultDesc">20秒間、パートナーの【2m以内】をキープせよ！</div>
             <button id="startBtn" onclick="resetGame()">試練に挑む</button>
         </div>
     </div>
@@ -386,7 +386,7 @@ gameLoop();
 
 // 【修正箇所③】ブラウザを開き直したとき、すでに転生データがあればタイトル画面（説明文）にも最初から表示してあげる
 if (reincarnationCount > 0) {
-    resultDesc.innerHTML = `20秒間、彼女の【2m以内】をキープせよ！<br><span class="count-badge">現在の転生回数: ${reincarnationCount} 回</span>`;
+    resultDesc.innerHTML = `20秒間、パートナーの【2m以内】をキープせよ！<br><span class="count-badge">現在の転生回数: ${reincarnationCount} 回</span>`;
 }
 </script>
 
