@@ -340,7 +340,9 @@ let writeStartTime=0;
 let out=false;
 let openAccum=0;
 let lastOpenTime=0;
-let rankings=[];
+
+// 【修正箇所①】読み込み時にlocalStorageからランキングデータを取得。無い場合は空の配列にする
+let rankings = JSON.parse(localStorage.getItem('teacherGameRankings')) || [];
 
 function rand(a,b){
   return Math.random()*(b-a)+a;
@@ -416,24 +418,27 @@ function flipTo(s){
   scheduleNextSwitch();
 }
 
+// 【修正箇所②】画面のランキング表示を更新するだけの関数を独立化
+function renderRankings(){
+  rankingList.innerHTML='';
+  rankings.forEach((s)=>{
+    const li=document.createElement('li');
+    li.textContent=`${s.toFixed(2)} 秒`;
+    rankingList.appendChild(li);
+  });
+}
+
 function updateRanking(score){
 
   rankings.push(score);
-
   rankings.sort((a,b)=>b-a);
-
   rankings=rankings.slice(0,5);
 
-  rankingList.innerHTML='';
+  // 【修正箇所③】新しいランキングをlocalStorageに保存する
+  localStorage.setItem('teacherGameRankings', JSON.stringify(rankings));
 
-  rankings.forEach((s)=>{
-
-    const li=document.createElement('li');
-
-    li.textContent=`${s.toFixed(2)} 秒`;
-
-    rankingList.appendChild(li);
-  });
+  // 画面に描画
+  renderRankings();
 }
 
 function gameOver(r){
@@ -604,6 +609,9 @@ window.onkeydown=(e)=>{
 };
 
 restart();
+
+// 【修正箇所④】ゲーム起動時に、保存されているランキングを初めて描画する
+renderRankings();
 
 </script>
 
