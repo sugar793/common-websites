@@ -128,7 +128,9 @@ const BASE_SPEED = 4; // プレイヤーの通常速度
 let gameActive = false;
 let timeLeft = 20.0; 
 let flowers = [];
-let reincarnationCount = 0; // ★転生回数のカウンター
+
+// 起動時にlocalStorageから転生回数を読み込む
+let reincarnationCount = parseInt(localStorage.getItem('loveDistanceReincarnationCount')) || 0;
 
 // キー入力状態
 const keys = {};
@@ -157,8 +159,9 @@ const cpu = {
     targetX: 400,
     targetY: 300,
     
-    update: function() {
-        this.stateTimer--;
+    // 【修正箇所】dt（経過時間係数）を受け取って処理するように変更
+    update: function(dt) {
+        this.stateTimer -= dt; // 1ずつ減らすのではなく、経過時間分減らす
         
         if (this.stateTimer <= 0) {
             if (this.state === 'walk') {
@@ -178,8 +181,9 @@ const cpu = {
             let dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist > 5) {
-                this.x += (dx / dist) * this.speed;
-                this.y += (dy / dist) * this.speed;
+                // 移動量に dt を掛け算
+                this.x += (dx / dist) * this.speed * dt;
+                this.y += (dy / dist) * this.speed * dt;
             }
         }
         
@@ -220,12 +224,13 @@ function endGame(isWin) {
     gameActive = false;
     overlay.classList.add('active');
     if (isWin) {
-        reincarnationCount++; // ★成功したら転生回数をカウントアップ
+        reincarnationCount++; 
+        localStorage.setItem('loveDistanceReincarnationCount', reincarnationCount);
         
         resultTitle.textContent = "神・籍入り！";
         resultTitle.style.color = "#2ed573";
         resultDesc.innerHTML = `素晴らしい！2mの籍入りチャレンジを乗り越えました！<br>あなたは真の愛を証明し、次の生へと歩みを進めます。<br><span class="count-badge">現在の転生回数: ${reincarnationCount} 回</span>`;
-        startBtn.textContent = "転生"; // ★ボタンを「転生」に変更
+        startBtn.textContent = "転生"; 
         startBtn.style.backgroundColor = "#2ed573";
         startBtn.style.boxShadow = "0 5px 15px rgba(46, 213, 115, 0.4)";
     } else {
@@ -242,23 +247,35 @@ function endGame(isWin) {
     }
 }
 
-function gameLoop() {
+// 【修正箇所】前回の実行時間を記録する変数と、ループの修正
+let lastTime = 0;
+function gameLoop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    
+    // 60FPS(約16.67ms)を基準「1.0」とした経過時間係数(dt)を計算
+    let dt = (timestamp - lastTime) / (1000 / 60);
+    lastTime = timestamp;
+
+    // ブラウザの別タブに移動したときなどに、キャラがワープするのを防ぐガード処理
+    if (dt > 10) dt = 1;
+
     if (gameActive) {
-        updateLogic();
+        updateLogic(dt); // updateLogicに経過時間を渡す
     }
     render();
     requestAnimationFrame(gameLoop);
 }
 
-function updateLogic() {
-    timeLeft -= 1 / 60; 
+// 【修正箇所】dtを受け取って、移動量やタイマー減少量に掛け算する
+function updateLogic(dt) {
+    timeLeft -= dt / 60; // 1秒間にきっちり1秒減るように調整
     if (timeLeft <= 0) {
         timeLeft = 0;
         endGame(true); 
         return;
     }
 
-    // ★ギミック：10秒経過（残り10秒以下）で荷物を持たされ速度が「3」に低下
+    // ギミック：10秒経過（残り10秒以下）で荷物を持たされ速度が「3」に低下
     if (timeLeft <= 10.0) {
         player.speed = 3; 
         player.hasBaggage = true;
@@ -267,16 +284,16 @@ function updateLogic() {
         player.hasBaggage = false;
     }
 
-    // プレイヤーの移動
-    if (keys['ArrowUp'] || keys['w'] || keys['W']) player.y -= player.speed;
-    if (keys['ArrowDown'] || keys['s'] || keys['S']) player.y += player.speed;
-    if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= player.speed;
-    if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += player.speed;
+    // プレイヤーの移動量に dt を掛け算
+    if (keys['ArrowUp'] || keys['w'] || keys['W']) player.y -= player.speed * dt;
+    if (keys['ArrowDown'] || keys['s'] || keys['S']) player.y += player.speed * dt;
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= player.speed * dt;
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += player.speed * dt;
 
     player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
     player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
-    cpu.update();
+    cpu.update(dt); // CPUの更新にもdtを渡す
 
     let dx = player.x - cpu.x;
     let dy = player.y - cpu.y;
@@ -357,7 +374,7 @@ function render() {
     let currentDistM = (Math.sqrt(dx * dx + dy * dy) / METER_TO_PX).toFixed(2);
 
     ctx.fillStyle = 'rgba(44, 62, 80, 0.8)';
-    ctx.fillRect(15, 15, 200, 95); // 回数表示のために少し縦を広げました
+    ctx.fillRect(15, 15, 200, 95); 
     ctx.strokeStyle = '#fff';
     ctx.strokeRect(15, 15, 200, 95);
 
@@ -377,7 +394,14 @@ function render() {
 }
 
 initFlowers();
-gameLoop();
+
+// 初回のループ駆動
+requestAnimationFrame(gameLoop);
+
+// ブラウザを開き直したとき、すでに転生データがあればタイトル画面（説明文）にも最初から表示してあげる
+if (reincarnationCount > 0) {
+    resultDesc.innerHTML = `20秒間、彼女の【2m以内】をキープせよ！<br><span class="count-badge">現在の転生回数: ${reincarnationCount} 回</span>`;
+}
 </script>
 
 </body>
