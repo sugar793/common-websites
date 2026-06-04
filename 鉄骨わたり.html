@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鉄骨わたりゲーム - グラフ分析機能付き</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            color: #333;
+        }
+        #game-container {
+            position: relative;
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #f0f0f0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            background-color: #ffffff;
+        }
+        #ui {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .stat {
+            background: #fcfcfc;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        #message-overlay {
+            position: absolute;
+            top: 75px; /* グラフの邪魔にならない位置に調整 */
+            left: 50%;
+            transform: translate(-50%, 0);
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            border-radius: 12px;
+            border: 2px solid #ccc;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        #instructions {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        .danger {
+            color: #d9534f;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui">
+            <div class="stat">距離: <span id="distance">0.00</span> / 10.00 m</div>
+            <div class="stat">時間: <span id="time">0.00</span> / 15.00 秒</div>
+            <div class="stat">傾き: <span id="angle-display">0.0</span>° / 20.0°</div>
+        </div>
+
+        <canvas id="gameCanvas" width="600" height="500"></canvas>
+
+        <div id="message-overlay">
+            <div id="status-text"></div>
+            <div style="font-size: 16px; color: #666; margin-top: 8px;">【R】キーを押してリトライ</div>
+        </div>
+        
+        <div id="instructions">【A】キーで左に傾ける / 【D】キーで右に傾ける（目指せ15秒完走！）</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI要素
+        const distanceId = document.getElementById('distance');
+        const timeId = document.getElementById('time');
+        const angleDisplayId = document.getElementById('angle-display');
+        const overlayId = document.getElementById('message-overlay');
+        const statusTextId = document.getElementById('status-text');
+
+        // ゲーム定数
+        const TOTAL_TIME = 15; 
+        const SPEED = 2 / 3;  
+        const MAX_ANGLE = 20;  
+
+        // ゲーム状態変数
+        let angle = 0;          
+        let timeElapsed = 0;    
+        let gameState = 'PLAYING'; 
+        let lastTimestamp = 0;
+
+        // プレイログ（グラフ描画用データ）
+        let gameLog = [];
+
+        // プレイヤーの物理位置（落下演出用）
+        let playerX = 300;
+        let playerY = 380; 
+        let fallSpeed = 0;
+
+        // 背景が流れる模様の進捗管理
+        let wallLines = [0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9];
+
+        // バランス調整用パラメータ
+        const SWAY_SPEED = 3.0;   
+        const GRAVITY_EFFECT = 2.2; 
+        const KEY_POWER = 1.8;     
+
+        // キーボード入力
+        window.addEventListener('keydown', (e) => {
+            if (gameState === 'PLAYING') {
+                if (e.key === 'a' || e.key === 'A') {
+                    angle -= KEY_POWER; 
+                } else if (e.key === 'd' || e.key === 'D') {
+                    angle += KEY_POWER; 
+                }
+            } else {
+                if (e.key === 'r' || e.key === 'R') {
+                    resetGame();
+                }
+            }
+        });
+
+        function resetGame() {
+            angle = (Math.random() - 0.5) * 4; 
+            timeElapsed = 0;
+            gameLog = []; // ログのリセット
+            gameState = 'PLAYING';
+            playerX = canvas.width / 2;
+            playerY = canvas.height - 120; 
+            fallSpeed = 0;
+            overlayId.style.display = 'none';
+            angleDisplayId.classList.remove('danger');
+            lastTimestamp = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameLoop(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const dt = (timestamp - lastTimestamp) / 1000; 
+            lastTimestamp = timestamp;
+
+            if (gameState === 'GRAPH_DISPLAY') return; // グラフ表示状態ならループ停止
+
+            if (gameState === 'PLAYING') {
+                // 1. 進捗更新
+                timeElapsed += dt;
+                
+                // リアルタイムでデータをログに記録
+                gameLog.push({ time: timeElapsed, angle: angle });
+
+                if (timeElapsed >= TOTAL_TIME) {
+                    timeElapsed = TOTAL_TIME;
+                    gameState = 'CLEAR';
+                    updateUI();
+                    endGame();
+                    return;
+                }
+
+                // 2. バランス計算
+                const sway = Math.sin(timestamp / 180) * SWAY_SPEED;
+                const gravity = angle * GRAVITY_EFFECT;
+                angle += (sway + gravity) * dt;
+
+                // 3. 壁の模様を動かす
+                for (let i = 0; i < wallLines.length; i++) {
+                    wallLines[i] += dt * 0.6;
+                    if (wallLines[i] >= 1.0) wallLines[i] -= 1.0;
+                }
+
+                // 4. ゲームオーバー判定
+                if (Math.abs(angle) >= MAX_ANGLE) {
+                    gameState = 'GAMEOVER';
+                    fallSpeed = 150; 
+                }
+                
+                // 通常の描画
+                draw();
+            } 
+            else if (gameState === 'GAMEOVER') {
+                // 落下アニメーション処理
+                fallSpeed += 1800 * dt; 
+                playerY += fallSpeed * dt; 
+                angle += (angle > 0 ? 450 : -450) * dt; 
+
+                // 通常の描画（プレイヤーが落ちていく）
+                draw();
+
+                // 完全に画面外に見えなくなったらグラフ表示フェーズへ
+                if (playerY > canvas.height + 150) {
+                    endGame();
+                    return;
+                }
+            }
+
+            updateUI();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateUI() {
+            const currentDistance = timeElapsed * SPEED;
+            distanceId.textContent = currentDistance.toFixed(2);
+            timeId.textContent = timeElapsed.toFixed(2);
+            angleDisplayId.textContent = Math.abs(angle).toFixed(1);
+
+            if (Math.abs(angle) >= 15 && gameState === 'PLAYING') {
+                angleDisplayId.classList.add('danger');
+            } else {
+                angleDisplayId.classList.remove('danger');
+            }
+        }
+
+        function draw() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height - 120; 
+
+            // 15度以上で背景・床を赤にする
+            const isDanger = Math.abs(angle) >= 15 && gameState === 'PLAYING';
+            ctx.fillStyle = isDanger ? '#ffcccc' : '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // --- 1. 壁の模様 ---
+            const vpX = 300;
+            const vpY = 150;
+            ctx.strokeStyle = isDanger ? '#ff9999' : '#e8e8e8';
+            ctx.lineWidth = 1.5;
+            const edgePoints = [
+                {x: 0, y: 50}, {x: 0, y: 380}, {x: 0, y: 215},
+                {x: 600, y: 50}, {x: 600, y: 380}, {x: 600, y: 215}
+            ];
+            edgePoints.forEach(pt => {
+                ctx.beginPath(); ctx.moveTo(vpX, vpY); ctx.lineTo(pt.x, pt.y); ctx.stroke();
+            });
+
+            wallLines.forEach(p => {
+                let z = p * p;
+                let lx = vpX - (vpX * z);
+                let lyTop = vpY - (100 * z);
+                let lyBottom = vpY + (230 * z);
+                ctx.beginPath(); ctx.moveTo(lx, lyTop); ctx.lineTo(lx, lyBottom); ctx.stroke();
+
+                let rx = vpX + ((canvas.width - vpX) * z);
+                let ryTop = vpY - (100 * z);
+                let ryBottom = vpY + (230 * z);
+                ctx.beginPath(); ctx.moveTo(rx, ryTop); ctx.lineTo(rx, ryBottom); ctx.stroke();
+            });
+
+            // --- 2. 基準線の描画（垂直な細い線） ---
+            ctx.strokeStyle = isDanger ? '#ffffff' : '#e0e0e0';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath(); ctx.moveTo(centerX, 20); ctx.lineTo(centerX, centerY); ctx.stroke();
+            ctx.setLineDash([]); 
+
+            // --- 3. 鉄骨の描画（幅30px） ---
+            ctx.fillStyle = '#B22222'; 
+            ctx.fillRect(centerX - 15, centerY, 30, 120);
+            ctx.fillStyle = '#8B1A1A';
+            ctx.fillRect(centerX - 15, centerY, 30, 6);
+
+            // --- 4. プレイヤー（体）の描画 ---
+            if (playerY < canvas.height + 100) {
+                ctx.save();
+                ctx.translate(centerX, playerY);
+                ctx.rotate(angle * Math.PI / 180);
+
+                ctx.strokeStyle = '#222222'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -140); ctx.stroke();
+
+                ctx.strokeStyle = '#444444'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(-70, -100); ctx.lineTo(70, -100); ctx.stroke();
+
+                ctx.fillStyle = '#222222';
+                ctx.beginPath(); ctx.arc(0, -155, 12, 0, Math.PI * 2); ctx.fill();
+
+                ctx.strokeStyle = '#222222'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-6, 0); ctx.moveTo(0, 0); ctx.lineTo(6, 0); ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // グラフを描画する新関数
+        function drawResultGraph() {
+            // 背景を白にクリア
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const padLeft = 65;
+            const padRight = 45;
+            const padTop = 220; // メッセージの下に配置するための余白
+            const padBottom = 50;
+            
+            const gWidth = canvas.width - padLeft - padRight;
+            const gHeight = canvas.height - padTop - padBottom;
+            
+            // グラフのタイトル・軸名
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 15px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('【 傾きのデータ推移グラフ 】', canvas.width / 2, padTop - 40);
+            
+            ctx.font = '11px sans-serif';
+            ctx.fillStyle = '#666666';
+            ctx.fillText('時間 (秒) ──►', canvas.width / 2, canvas.height - 15);
+            
+            ctx.save();
+            ctx.translate(20, padTop + gHeight / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('◄ 左傾き   角度 (度)   右傾き ►', 0, 0);
+            ctx.restore();
+
+            // 縦軸（角度）の目盛り線設定 (-20, -10, 0, 10, 20)
+            const yTicks = [-20, -10, 0, 10, 20];
+            yTicks.forEach(deg => {
+                // 0度が中心になるようマッピング
+                const y = padTop + gHeight / 2 - (deg / MAX_ANGLE) * (gHeight / 2);
+                
+                ctx.beginPath();
+                ctx.moveTo(padLeft, y);
+                ctx.lineTo(padLeft + gWidth, y);
+                
+                if (deg === 0) {
+                    ctx.strokeStyle = '#555555'; // 0度中央線は少し濃く
+                    ctx.lineWidth = 1.5;
+                } else {
+                    ctx.strokeStyle = '#e5e5e5';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]); // 補助線は点線
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 数値ラベル
+                ctx.fillStyle = deg === 0 ? '#333' : '#888';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText((deg > 0 ? '+' : '') + deg + '°', padLeft - 10, y);
+            });
+            
+            // 横軸（時間）の目盛り線設定 (0から15秒まで3秒刻み)
+            const xTicks = [0, 3, 6, 9, 12, 15];
+            xTicks.forEach(sec => {
+                const x = padLeft + (sec / TOTAL_TIME) * gWidth;
+                
+                ctx.beginPath();
+                ctx.moveTo(x, padTop);
+                ctx.lineTo(x, padTop + gHeight);
+                ctx.strokeStyle = '#e5e5e5';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = '#888';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(sec + 's', x, padTop + gHeight + 8);
+            });
+
+            // 外枠を描画
+            ctx.strokeStyle = '#cccccc';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(padLeft, padTop, gWidth, gHeight);
+            
+            // プレイログデータのプロット（赤い折れ線）
+            if (gameLog.length > 0) {
+                ctx.strokeStyle = '#ff4757'; 
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                
+                gameLog.forEach((data, index) => {
+                    const x = padLeft + (data.time / TOTAL_TIME) * gWidth;
+                    // 縦軸反転（上がプラス度数、下がマイナス度数）
+                    const y = padTop + gHeight / 2 - (data.angle / MAX_ANGLE) * (gHeight / 2);
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+            }
+        }
+
+        function endGame() {
+            gameState = 'GRAPH_DISPLAY'; // グラフ静止状態へ移行
+
+            if (timeElapsed >= TOTAL_TIME) {
+                statusTextId.textContent = '🎉 成功！10mを渡りきった！';
+                statusTextId.style.color = '#2ed573';
+            } else {
+                statusTextId.textContent = '💀 落下！ゲームオーバー';
+                statusTextId.style.color = '#ff4757';
+            }
+            
+            // 最後に画面をクリアしてグラフを描画
+            drawResultGraph();
+            overlayId.style.display = 'block';
+        }
+
+        // ゲーム起動
+        resetGame();
+    </script>
+</body>
+</html>
