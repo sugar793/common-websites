@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Weaver - Gravity & Light Puzzle</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* 全体セットアップ */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050b14;
+            color: #f8fafc;
+            font-family: 'Comfortaa', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* アスペクト比16:9固定のゲームコンテナ */
+        #game-container {
+            position: relative;
+            width: 1280px;
+            height: 720px;
+            background: #080f1d;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+            border: 2px solid #1e293b;
+            border-radius: 12px;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 1;
+        }
+
+        /* 画面レイヤー共通 */
+        .overlay-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(5, 11, 20, 0.85);
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        /* スタート画面の装飾 */
+        #start-screen {
+            background: radial-gradient(circle at center, #0e1e38 0%, #050b14 100%);
+        }
+
+        h1.title {
+            font-size: 72px;
+            font-weight: 700;
+            color: #38bdf8;
+            margin: 0 0 10px 0;
+            letter-spacing: 4px;
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 20px;
+            color: #94a3b8;
+            margin-bottom: 40px;
+            letter-spacing: 2px;
+        }
+
+        .rules-panel {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid #1e293b;
+            padding: 24px 40px;
+            border-radius: 16px;
+            margin-bottom: 40px;
+            max-width: 600px;
+            text-align: left;
+            line-height: 1.8;
+            color: #cbd5e1;
+            font-size: 15px;
+        }
+
+        .rules-panel strong {
+            color: #38bdf8;
+        }
+
+        .start-btn {
+            font-family: 'Comfortaa', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: #050b14;
+            background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+            border: none;
+            padding: 16px 48px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(14, 165, 233, 0.4);
+            transition: all 0.2s ease;
+            letter-spacing: 2px;
+        }
+
+        .start-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(14, 165, 233, 0.6);
+            background: linear-gradient(90deg, #7dd3fc, #38bdf8);
+        }
+
+        .start-btn:active {
+            transform: translateY(-1px);
+        }
+
+        /* 記録表示 */
+        .records-panel {
+            display: flex;
+            gap: 40px;
+            margin-top: 30px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 18px;
+            color: #f59e0b;
+        }
+
+        .record-val {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* プレイ中のゲームUI */
+        #game-ui {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            right: 24px;
+            z-index: 5;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .ui-box {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid #334155;
+            padding: 12px 24px;
+            border-radius: 10px;
+            backdrop-filter: blur(4px);
+        }
+
+        .ui-label {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .ui-value {
+            font-size: 24px;
+            color: #38bdf8;
+            font-weight: bold;
+        }
+
+        #timer-value {
+            color: #f59e0b;
+        }
+
+        /* クリアメッセージ（改行なしのコンパクト設計） */
+        .msg-box {
+            background: rgba(8, 15, 29, 0.95);
+            border: 2px solid #38bdf8;
+            padding: 30px 60px;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(56, 189, 248, 0.3);
+            text-align: center;
+        }
+
+        .all-clear-box {
+            border-color: #f59e0b;
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.3);
+        }
+
+        .msg-title {
+            font-size: 36px;
+            font-weight: 700;
+            color: #38bdf8;
+            margin: 0;
+            white-space: nowrap; /* 改行を完全に防ぐ */
+            letter-spacing: 2px;
+        }
+
+        .all-clear-title {
+            color: #f59e0b;
+            font-size: 42px;
+        }
+
+        .msg-sub {
+            font-size: 18px;
+            color: #94a3b8;
+            margin-top: 10px;
+            white-space: nowrap;
+        }
+
+        .time-report {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 28px;
+            color: #fff;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- 背景・演出用 Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- プレイ中のHUD -->
+        <div id="game-ui" class="hidden">
+            <div class="ui-box">
+                <div class="ui-label">Level</div>
+                <div class="ui-value" id="ui-level">1</div>
+            </div>
+            <div class="ui-box" style="text-align: center;">
+                <div class="ui-label">Shadows Lit</div>
+                <div class="ui-value"><span id="ui-lit">0</span> / <span id="ui-total">0</span></div>
+            </div>
+            <div class="ui-box" style="text-align: right;">
+                <div class="ui-label">Time</div>
+                <div class="ui-value" id="timer-value">00:00.00</div>
+            </div>
+        </div>
+
+        <!-- スタート画面 -->
+        <div id="start-screen" class="overlay-layer">
+            <h1 class="title">SHADOW WEAVER</h1>
+            <div class="subtitle">Gravity & Light System</div>
+            
+            <div class="rules-panel">
+                • マウスの動きに<strong>「光の粒子（白いコア）」</strong>が慣性を伴って追従します。<br>
+                • <strong>マウスをクリック（長押し）</strong>すると引力が一気に強化されます。<br>
+                • ステージ上の<strong>「暗い影（黒い球）」</strong>をすべて光（ゴールド）で照らせばクリア！<br>
+                • 全5ステージをクリアするまでの時間を競います。
+            </div>
+
+            <button class="start-btn" id="btn-start">GAME START</button>
+
+            <div class="records-panel">
+                <div>PREV TIME: <span id="val-prev-time" class="record-val">--:--.--</span></div>
+                <div>BEST TIME: <span id="val-best-time" class="record-val">--:--.--</span></div>
+            </div>
+        </div>
+
+        <!-- ステージクリアメッセージ -->
+        <div id="stage-clear-overlay" class="overlay-layer hidden">
+            <div class="msg-box">
+                <h2 class="msg-title">STAGE CLEAR</h2>
+                <div class="msg-sub">Next warp charging...</div>
+            </div>
+        </div>
+
+        <!-- オールクリア（ゲーム終了）メッセージ -->
+        <div id="all-clear-overlay" class="overlay-layer hidden">
+            <div class="msg-box all-clear-box">
+                <h2 class="msg-title all-clear-title">ALL STAGES CLEAR!</h2>
+                <div class="msg-sub">おめでとう！すべての影に光が灯りました</div>
+                <div class="time-report">Clear Time: <span id="clear-time-display">00:00.00</span></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+
+// 各種UIエレメント
+const uiLevel = document.getElementById('ui-level');
+const uiLit = document.getElementById('ui-lit');
+const uiTotal = document.getElementById('ui-total');
+const uiTimer = document.getElementById('timer-value');
+const startScreen = document.getElementById('start-screen');
+const gameUi = document.getElementById('game-ui');
+const stageClearOverlay = document.getElementById('stage-clear-overlay');
+const allClearOverlay = document.getElementById('all-clear-overlay');
+const btnStart = document.getElementById('btn-start');
+const clearTimeDisplay = document.getElementById('clear-time-display');
+const valPrevTime = document.getElementById('val-prev-time');
+const valBestTime = document.getElementById('val-best-time');
+
+// 解像度は1280x720で完全固定
+const virtualWidth = 1280;
+const virtualHeight = 720;
+canvas.width = virtualWidth;
+canvas.height = virtualHeight;
+
+// ゲーム状態管理
+let gameState = 'title'; // 'title', 'playing', 'stage-clear', 'all-clear'
+let mouse = { x: virtualWidth / 2, y: virtualHeight / 2, down: false };
+let light = { x: 200, y: 360, vx: 0, vy: 0 };
+let particles = [];
+let shadows = [];
+let currentLevel = 1;
+
+// タイマー用
+let timerStart = 0;
+let timerElapsed = 0;
+let timerInterval = null;
+
+// レベル定義（全5レベル）
+const levels = {
+    1: [
+        { x: 400, y: 360, r: 60, lit: false },
+        { x: 880, y: 360, r: 60, lit: false }
+    ],
+    2: [
+        { x: 300, y: 200, r: 50, lit: false },
+        { x: 640, y: 500, r: 70, lit: false },
+        { x: 980, y: 200, r: 50, lit: false }
+    ],
+    3: [
+        { x: 250, y: 180, r: 40, lit: false },
+        { x: 250, y: 540, r: 40, lit: false },
+        { x: 640, y: 360, r: 80, lit: false },
+        { x: 1030, y: 360, r: 45, lit: false }
+    ],
+    4: [
+        { x: 200, y: 360, r: 50, lit: false },
+        { x: 500, y: 180, r: 40, lit: false },
+        { x: 500, y: 540, r: 40, lit: false },
+        { x: 850, y: 220, r: 45, lit: false },
+        { x: 1050, y: 500, r: 65, lit: false }
+    ],
+    5: [
+        { x: 180, y: 180, r: 35, lit: false },
+        { x: 180, y: 540, r: 35, lit: false },
+        { x: 640, y: 180, r: 50, lit: false },
+        { x: 640, y: 540, r: 50, lit: false },
+        { x: 1100, y: 180, r: 35, lit: false },
+        { x: 1100, y: 540, r: 35, lit: false },
+        { x: 640, y: 360, r: 90, lit: false } // 中央に巨大な影
+    ]
+};
+
+const maxLevel = 5;
+
+// ローカルストレージからハイスコア等取得
+function loadRecords() {
+    const prev = localStorage.getItem('shadow_weaver_prev');
+    const best = localStorage.getItem('shadow_weaver_best');
+    valPrevTime.textContent = prev ? formatTime(parseFloat(prev)) : '--:--.--';
+    valBestTime.textContent = best ? formatTime(parseFloat(best)) : '--:--.--';
+}
+
+// タイム表示の整形関数 (ミリ秒対応)
+function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    const ms = Math.floor((sec % 1) * 100);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+}
+
+// マウス座標の計算（キャンバスの縮小表示に対応）
+function setMousePosition(e) {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - rect.left) / rect.width * virtualWidth;
+    mouse.y = (e.clientY - rect.top) / rect.height * virtualHeight;
+}
+
+window.addEventListener('mousemove', setMousePosition);
+window.addEventListener('mousedown', () => mouse.down = true);
+window.addEventListener('mouseup', () => mouse.down = false);
+
+// コンテナ外でクリックを離した時の処理
+window.addEventListener('dragstart', (e) => e.preventDefault());
+
+btnStart.addEventListener('click', startGame);
+
+loadRecords();
+
+// タイトル画面用のデコレーション（漂う光のパーティクル）
+function createAmbientParticles() {
+    if (Math.random() < 0.1) {
+        particles.push({
+            x: Math.random() * virtualWidth,
+            y: virtualHeight + 10,
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: -Math.random() * 0.8 - 0.2,
+            life: 300 + Math.random() * 200,
+            color: 'rgba(56, 189, 248, 0.2)',
+            size: Math.random() * 2 + 1
+        });
+    }
+}
+
+function startGame() {
+    currentLevel = 1;
+    timerElapsed = 0;
+    particles = [];
+    
+    startScreen.classList.add('hidden');
+    gameUi.classList.remove('hidden');
+    stageClearOverlay.classList.add('hidden');
+    allClearOverlay.classList.add('hidden');
+    
+    gameState = 'playing';
+    timerStart = performance.now();
+    
+    initLevel(currentLevel);
+}
+
+function initLevel(levelNum) {
+    // 影をリセットして読み込み
+    shadows = levels[levelNum].map(s => ({ ...s, lit: false }));
+    uiTotal.textContent = shadows.length;
+    uiLit.textContent = '0';
+    uiLevel.textContent = levelNum;
+    
+    // プレイヤー初期位置
+    light.x = 100;
+    light.y = 360;
+    light.vx = 0;
+    light.vy = 0;
+    
+    stageClearOverlay.classList.add('hidden');
+    gameState = 'playing';
+}
+
+function update() {
+    // タイトル画面の微粒子生成
+    if (gameState === 'title' || gameState === 'all-clear') {
+        createAmbientParticles();
+    }
+
+    if (gameState === 'playing') {
+        // 現在のタイム更新
+        timerElapsed = (performance.now() - timerStart) / 1000;
+        uiTimer.textContent = formatTime(timerElapsed);
+
+        // 物理演算（慣性＆クリック時の加速）
+        let dx = mouse.x - light.x;
+        let dy = mouse.y - light.y;
+        let accel = mouse.down ? 0.0025 : 0.001;
+        light.vx += dx * accel;
+        light.vy += dy * accel;
+        
+        // 減衰
+        let friction = mouse.down ? 0.94 : 0.96;
+        light.vx *= friction;
+        light.vy *= friction;
+        
+        light.x += light.vx;
+        light.y += light.vy;
+
+        // 壁との衝突（画面外に出ていかないように）
+        if (light.x < 15) { light.x = 15; light.vx *= -0.5; }
+        if (light.x > virtualWidth - 15) { light.x = virtualWidth - 15; light.vx *= -0.5; }
+        if (light.y < 15) { light.y = 15; light.vy *= -0.5; }
+        if (light.y > virtualHeight - 15) { light.y = virtualHeight - 15; light.vy *= -0.5; }
+
+        // 吸い込みエフェクト（クリック中）
+        if (mouse.down) {
+            for (let i = 0; i < 2; i++) {
+                particles.push({
+                    x: light.x + (Math.random() - 0.5) * 40,
+                    y: light.y + (Math.random() - 0.5) * 40,
+                    vx: (light.vx + (Math.random() - 0.5) * 2) * 1.2,
+                    vy: (light.vy + (Math.random() - 0.5) * 2) * 1.2,
+                    life: 40 + Math.random() * 20,
+                    color: `hsla(${190 + Math.random() * 40}, 100%, 75%, 0.8)`, // シアン系
+                    size: Math.random() * 2 + 1
+                });
+            }
+        }
+
+        // 衝突判定とクリアチェック
+        let litCount = 0;
+        shadows.forEach(s => {
+            let dist = Math.hypot(light.x - s.x, light.y - s.y);
+
+            // まだ灯っていない影の近くにいる時の吸引・渦粒子
+            if (dist < s.r + 80 && !s.lit) {
+                particles.push({
+                    x: s.x + (Math.random() - 0.5) * (s.r * 2),
+                    y: s.y + (Math.random() - 0.5) * (s.r * 2),
+                    vx: (s.x - light.x) * 0.015 + (Math.random() - 0.5) * 2,
+                    vy: (s.y - light.y) * 0.015 + (Math.random() - 0.5) * 2,
+                    life: 25,
+                    color: `hsla(200, 100%, 70%, 0.6)`,
+                    size: Math.random() * 1.5 + 1
+                });
+            }
+
+            // 衝突したらキープ
+            if (dist < s.r) {
+                if (!s.lit) {
+                    s.lit = true;
+                    // 灯ったときの大爆発エフェクト
+                    for (let i = 0; i < 40; i++) {
+                        let angle = Math.random() * Math.PI * 2;
+                        let speed = Math.random() * 6 + 2;
+                        particles.push({
+                            x: s.x,
+                            y: s.y,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed,
+                            life: 60 + Math.random() * 40,
+                            color: `hsla(${35 + Math.random() * 15}, 100%, 65%, 0.9)`, // ゴールド
+                            size: Math.random() * 3 + 1.5
+                        });
+                    }
+                }
+            }
+
+            if (s.lit) litCount++;
+        });
+
+        uiLit.textContent = litCount;
+
+        // クリア判定
+        if (litCount === shadows.length) {
+            if (currentLevel === maxLevel) {
+                // レベル5（最終）をクリアしたら、中間を挟まず直接「オールクリア」へ
+                handleAllClear();
+            } else {
+                // 通常クリア
+                handleStageClear();
+            }
+        }
+    }
+
+    // 全ての粒子の更新
+    particles = particles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        return p.life > 0;
+    });
+}
+
+function handleStageClear() {
+    gameState = 'stage-clear';
+    stageClearOverlay.classList.remove('hidden');
+    currentLevel++;
+    setTimeout(() => {
+        initLevel(currentLevel);
+    }, 1500); // 1.5秒後に次へ
+}
+
+function handleAllClear() {
+    gameState = 'all-clear';
+    gameUi.classList.add('hidden');
+    allClearOverlay.classList.remove('hidden');
+    
+    // スコア記録
+    const finalTime = timerElapsed;
+    clearTimeDisplay.textContent = formatTime(finalTime);
+    
+    localStorage.setItem('shadow_weaver_prev', finalTime);
+    
+    const best = localStorage.getItem('shadow_weaver_best');
+    if (!best || finalTime < parseFloat(best)) {
+        localStorage.setItem('shadow_weaver_best', finalTime);
+    }
+    
+    // 5秒後にタイトル画面に戻る
+    setTimeout(() => {
+        allClearOverlay.classList.add('hidden');
+        startScreen.classList.remove('hidden');
+        loadRecords();
+        gameState = 'title';
+    }, 5000);
+}
+
+function draw() {
+    // 背景をクリア（わずかに残すことで光の残像を演出）
+    ctx.fillStyle = 'rgba(5, 11, 20, 0.3)';
+    ctx.fillRect(0, 0, virtualWidth, virtualHeight);
+
+    // 粒子の描画
+    particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life / 100);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1.0; // リセット
+
+    // 影（ブラックホール）の描画
+    shadows.forEach(s => {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        
+        if (s.lit) {
+            // 点灯中のゴールデンネオン効果
+            let grad = ctx.createRadialGradient(s.x, s.y, s.r * 0.2, s.x, s.y, s.r);
+            grad.addColorStop(0, '#fffbe5');
+            grad.addColorStop(0.3, '#f59e0b');
+            grad.addColorStop(1, '#78350f');
+            ctx.fillStyle = grad;
+        } else {
+            // 未点灯時のダークな影効果
+            let grad = ctx.createRadialGradient(s.x, s.y, s.r * 0.8, s.x, s.y, s.r);
+            grad.addColorStop(0, '#020617');
+            grad.addColorStop(1, '#1e293b');
+            ctx.fillStyle = grad;
+        }
+        ctx.fill();
+
+        // 影の枠線
+        ctx.strokeStyle = s.lit ? '#f59e0b' : '#334155';
+        ctx.lineWidth = s.lit ? 3 : 1.5;
+        ctx.stroke();
+    });
+
+    // プレイヤーコア（光源）の描画
+    if (gameState === 'playing' || gameState === 'stage-clear') {
+        // 外側の淡いオーラ
+        let radialGrad = ctx.createRadialGradient(light.x, light.y, 1, light.x, light.y, 25);
+        radialGrad.addColorStop(0, '#ffffff');
+        radialGrad.addColorStop(0.2, '#38bdf8');
+        radialGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(light.x, light.y, 25, 0, Math.PI * 2);
+        ctx.fillStyle = radialGrad;
+        ctx.fill();
+
+        // 中心コア
+        ctx.beginPath();
+        ctx.arc(light.x, light.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+    }
+}
+
+// メインループ
+function tick() {
+    update();
+    draw();
+    requestAnimationFrame(tick);
+}
+
+// 最初のループ開始
+tick();
+</script>
+</body>
+</html>

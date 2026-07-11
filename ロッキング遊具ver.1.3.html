@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ぶっ飛びロッキング遊具・怪 ver2.5</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: sans-serif;
+      background: linear-gradient(#a0eaff, #d0f0ff);
+      overflow: hidden;
+      transition: background 1s ease, color 1s ease;
+    }
+
+    h1 {
+      margin-bottom: 5px;
+    }
+
+    #formDisplay {
+      font-size: 22px;
+      font-weight: bold;
+      margin: 10px auto;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+      transition: color 0.5s;
+    }
+
+    #rocking {
+      margin: 40px auto;
+      width: 300px;
+      height: 217px;
+      background: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQJuDQil9sZAacUaezr-v2yYzxF63_fJDi1vg&s') center/contain no-repeat;
+      transform-origin: center center;
+      transition: transform 0.05s linear, filter 0.5s ease, box-shadow 0.5s ease;
+      box-shadow: 0 20px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    #pressBtn {
+      font-size: 20px;
+      padding: 12px 24px;
+      cursor: pointer;
+      background-color: #ff8c00;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      transition: background-color 0.5s, color 0.5s;
+    }
+
+    #message {
+      font-size: 20px;
+      font-weight: bold;
+      color: red;
+      margin-top: 10px;
+      height: 24px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+
+    #speedBarContainer {
+      width: 300px;
+      height: 16px;
+      background: #ccc;
+      margin: 15px auto;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #speedBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #00f260, #0575e6);
+      transition: width 0.05s;
+    }
+
+    #flyCountDisplay {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    #distanceDisplay {
+      font-size: 18px;
+      margin-top: 5px;
+    }
+
+    .control-panel {
+      margin: 10px;
+    }
+
+    #difficultySelect {
+      font-size: 16px;
+      padding: 5px;
+    }
+
+    /* セーブ削除ボタンのスタイル */
+    #resetBtn {
+      font-size: 12px;
+      padding: 5px 10px;
+      cursor: pointer;
+      background-color: #777;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      margin-left: 15px;
+      opacity: 0.6;
+      transition: opacity 0.3s, background-color 0.3s;
+    }
+    #resetBtn:hover {
+      opacity: 1;
+      background-color: #d9534f;
+    }
+  </style>
+</head>
+<body>
+  <h1>ぶっ飛びロッキング遊具・怪</h1>
+  
+  <div class="control-panel">
+    <label for="difficultySelect">飛びやすさ：</label>
+    <select id="difficultySelect">
+      <option value="easy">やさしい</option>
+      <option value="normal" selected>ふつう</option>
+      <option value="hard">むずかしい</option>
+      <option value="oni">👹 鬼 (無理ゲー)</option>
+    </select>
+
+    <!-- セーブデータ削除ボタン -->
+    <button id="resetBtn">記憶を消去する</button>
+  </div>
+
+  <div id="formDisplay">現在の形態: 無垢なるパンダ</div>
+
+  <div id="rocking"></div>
+  <button id="pressBtn">タップで回す！</button>
+
+  <div id="speedBarContainer"><div id="speedBar"></div></div>
+  <div id="flyCountDisplay">とんだ回数: 0</div>
+  <div id="distanceDisplay"></div>
+  <div id="message"></div>
+
+  <audio id="spinSound" src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Buttonclick02.ogg"></audio>
+  <audio id="flySound" src="https://upload.wikimedia.org/wikipedia/commons/9/97/Whoosh.ogg"></audio>
+
+  <script>
+    const rocking = document.getElementById('rocking');
+    const button = document.getElementById('pressBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const message = document.getElementById('message');
+    const flyCountDisplay = document.getElementById('flyCountDisplay');
+    const formDisplay = document.getElementById('formDisplay');
+    const speedBar = document.getElementById('speedBar');
+    const distanceDisplay = document.getElementById('distanceDisplay');
+    const difficultySelect = document.getElementById('difficultySelect');
+
+    const spinSound = document.getElementById('spinSound');
+    const flySound = document.getElementById('flySound');
+
+    let angle = 0;
+    let angularVelocity = 0;
+    let flyCount = Number(localStorage.getItem("flyCount")) || 0;
+    let flying = false;
+    let currentFlyMsg = "ぶっ飛んだー！！";
+
+    // ★ 難易度ごとの設定（「鬼」を追加）
+    const difficultySettings = {
+      easy: { trigger: 35, power: 1600 },
+      normal: { trigger: 55, power: 2300 },
+      hard: { trigger: 75, power: 3000 },
+      oni: { trigger: 100, power: 5000 } // 必要速度が超上昇、パワーは驚異の5000
+    };
+
+    let currentDifficulty = "normal";
+    let FLY_TRIGGER_SPEED = difficultySettings[currentDifficulty].trigger;
+    let FLY_POWER = difficultySettings[currentDifficulty].power;
+
+    // 禍々しい変化のステージ定義
+    const evolutionStages = [
+      {
+        minCount: 0,
+        name: "【第I形態】無垢なるパンダ",
+        filter: "none",
+        shadow: "0 20px 30px rgba(0, 0, 0, 0.3)",
+        bg: "linear-gradient(#a0eaff, #d0f0ff)",
+        textColor: "#000000",
+        formColor: "#007acc",
+        btnBg: "#ff8c00",
+        btnColor: "#ffffff",
+        flyMsg: "ぶっ飛んだー！！"
+      },
+      {
+        minCount: 5,
+        name: "【第II形態】不穏な泥人形",
+        filter: "hue-rotate(100deg) saturate(0.6) brightness(0.8)",
+        shadow: "0 20px 30px rgba(40, 60, 40, 0.6)",
+        bg: "linear-gradient(#708090, #a9a9a9)",
+        textColor: "#2f4f4f",
+        formColor: "#2e8b57",
+        btnBg: "#556b2f",
+        btnColor: "#ffffff",
+        flyMsg: "キィィィ…と軋みを上げて吹き飛んだ！"
+      },
+      {
+        minCount: 15,
+        name: "【第III形態】呪われし揺籠",
+        filter: "hue-rotate(280deg) contrast(1.5) brightness(0.7)",
+        shadow: "0 0 25px rgba(139, 0, 0, 0.8)",
+        bg: "linear-gradient(#2b1d42, #4a0e17)",
+        textColor: "#dfd5df",
+        formColor: "#ff4500",
+        btnBg: "#8b0000",
+        btnColor: "#ffcccc",
+        flyMsg: "生贄を求めるように、血の空へと消えた…！"
+      },
+      {
+        minCount: 30,
+        name: "【第IV形態】異界の侵略獣",
+        filter: "invert(0.9) hue-rotate(180deg) contrast(2)",
+        shadow: "0 0 35px #00ffcc, 0 0 10px #000",
+        bg: "linear-gradient(#0d001a, #001a1a)",
+        textColor: "#00ffcc",
+        formColor: "#b100ff",
+        btnBg: "#1a0033",
+        btnColor: "#00ffcc",
+        flyMsg: "空間を歪め、次元の裂け目へと跳躍した！！"
+      },
+      {
+        minCount: 50,
+        name: "【最終形態】終焉を齎す揺霊（パンデモニウム）",
+        filter: "contrast(5) invert(1) brightness(0.6) saturate(2)",
+        shadow: "0 0 50px #ff0000, 0 0 30px #000000",
+        bg: "linear-gradient(#000000, #1a0000)",
+        textColor: "#ff3333",
+        formColor: "#ff0000",
+        btnBg: "#000000",
+        btnColor: "#ff0000",
+        flyMsg: "世界線が崩壊するッ！ 現実から消失したァ！！！"
+      }
+    ];
+
+    function updateEvolution() {
+      let currentStage = evolutionStages[0];
+      
+      for (let i = evolutionStages.length - 1; i >= 0; i--) {
+        if (flyCount >= evolutionStages[i].minCount) {
+          currentStage = evolutionStages[i];
+          break;
+        }
+      }
+
+      document.body.style.background = currentStage.bg;
+      document.body.style.color = currentStage.textColor;
+      
+      rocking.style.filter = currentStage.filter;
+      rocking.style.boxShadow = currentStage.shadow;
+      
+      formDisplay.textContent = currentStage.name;
+      formDisplay.style.color = currentStage.formColor;
+      
+      button.style.backgroundColor = currentStage.btnBg;
+      button.style.color = currentStage.btnColor;
+      
+      currentFlyMsg = currentStage.flyMsg;
+    }
+
+    flyCountDisplay.textContent = `とんだ回数: ${flyCount}`;
+    updateEvolution();
+
+    difficultySelect.addEventListener("change", () => {
+      currentDifficulty = difficultySelect.value;
+      FLY_TRIGGER_SPEED = difficultySettings[currentDifficulty].trigger;
+      FLY_POWER = difficultySettings[currentDifficulty].power;
+    });
+
+    // ★ セーブデータ削除（記憶消去）処理
+    resetBtn.addEventListener("click", () => {
+      if (flying) return; // 飛行中はリセット不可
+      
+      const confirmReset = confirm("これまでの飛行記録をすべて抹消し、パンダの呪いを解きますか？\n（とんだ回数が0に戻ります）");
+      if (confirmReset) {
+        localStorage.removeItem("flyCount");
+        flyCount = 0;
+        flyCountDisplay.textContent = `とんだ回数: ${flyCount}`;
+        message.textContent = "世界の記憶がリセットされた…";
+        distanceDisplay.textContent = "";
+        updateEvolution(); // 初期形態に戻す
+      }
+    });
+
+    function animate() {
+      if (!flying) {
+        angle += angularVelocity;
+        angularVelocity *= 0.98;
+
+        rocking.style.transform = `rotate(${angle}deg)`;
+
+        const percent = Math.min(angularVelocity / FLY_TRIGGER_SPEED, 1) * 100;
+        speedBar.style.width = `${percent}%`;
+
+        if (angularVelocity >= FLY_TRIGGER_SPEED) {
+          flyAway();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function flyAway() {
+      flying = true;
+      flyCount++;
+      localStorage.setItem("flyCount", flyCount);
+      flyCountDisplay.textContent = `とんだ回数: ${flyCount}`;
+
+      const angleDeg = 45 + Math.random() * 90;
+      const rad = angleDeg * Math.PI / 180;
+      const dx = Math.cos(rad) * FLY_POWER;
+      const dy = Math.sin(rad) * FLY_POWER;
+      const distance = Math.round(Math.sqrt(dx * dx + dy * dy));
+
+      flySound.currentTime = 0;
+      flySound.play();
+
+      rocking.style.transition = 'transform 1s ease-out';
+      rocking.style.transform = `translate(${dx}px, ${-dy}px) rotate(${angle + 1440}deg)`;
+
+      message.textContent = currentFlyMsg;
+      distanceDisplay.textContent = `飛距離: ${distance}px / 方向: ${angleDeg.toFixed(1)}度`;
+
+      setTimeout(() => {
+        rocking.style.transition = 'transform 1s ease-in';
+        rocking.style.transform = 'translate(0, 0) rotate(0deg)';
+      }, 1200);
+
+      setTimeout(() => {
+        angle = 0;
+        angularVelocity = 0;
+        flying = false;
+        message.textContent = '戻ってきたよ！';
+        distanceDisplay.textContent = '';
+        rocking.style.transition = '';
+        
+        updateEvolution();
+      }, 2400);
+    }
+
+    button.addEventListener('click', () => {
+      if (flying) return;
+      angularVelocity += 5 + Math.random() * 5;
+      spinSound.currentTime = 0;
+      spinSound.play();
+      message.textContent = '';
+    });
+
+    button.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      button.click();
+    });
+
+    animate();
+  </script>
+</body>
+</html>
