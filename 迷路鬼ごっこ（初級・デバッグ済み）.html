@@ -161,7 +161,7 @@ function showModal(message){document.getElementById("modal-message").innerHTML=m
 function restartGame(){location.reload();}
 function showShortestPath(){shortestPath=bfs(player,goal);}
 
-// キー押下表示
+// キー押下表示 
 const pressedKeys={};
 function updateKeyDisplay(){["w","a","s","d","ArrowUp","ArrowLeft","ArrowDown","ArrowRight"].forEach(k=>{const idMap={"w":"key-w","a":"key-a","s":"key-s","d":"key-d","ArrowUp":"key-up","ArrowLeft":"key-left","ArrowDown":"key-down","ArrowRight":"key-right"};const el=document.getElementById(idMap[k]);if(el){if(pressedKeys[k]) el.classList.add("pressed");else el.classList.remove("pressed");}})}
 document.addEventListener("keydown",e=>{if(!canMove||gameOver)return;pressedKeys[e.key]=true;updateKeyDisplay();const cell=grid[index(player.x,player.y)];if(e.key=="ArrowUp"||e.key=="w"){if(!cell.walls[0])player.y--;}else if(e.key=="ArrowDown"||e.key=="s"){if(!cell.walls[2])player.y++;}else if(e.key=="ArrowLeft"||e.key=="a"){if(!cell.walls[3])player.x--;}else if(e.key=="ArrowRight"||e.key=="d"){if(!cell.walls[1])player.x++;}});
