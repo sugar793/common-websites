@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CYBER SPIN - サイバー・ベーゴマバトル</title>
+    <style>
+        :root {
+            --neon-blue: #00f0ff;
+            --neon-pink: #ff007f;
+            --bg-color: #0a0a16;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        h1 {
+            margin: 10px 0 5px 0;
+            font-size: 28px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px var(--neon-blue);
+            color: var(--neon-blue);
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+            border-radius: 50%;
+            overflow: hidden;
+        }
+
+        canvas {
+            background: radial-gradient(circle, #15152a 0%, #080812 70%, #030307 100%);
+            display: block;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .status-panel {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 120px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .player-status { border-color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue); }
+        .enemy-status { border-color: var(--neon-pink); text-shadow: 0 0 5px var(--neon-pink); }
+
+        .bar-container {
+            width: 100%;
+            height: 8px;
+            background: #222;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .bar {
+            height: 100%;
+            width: 100%;
+            transition: width 0.1s ease-out;
+        }
+        #player-spin-bar { background: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
+        #enemy-spin-bar { background: var(--neon-pink); box-shadow: 0 0 8px var(--neon-pink); }
+
+        #instructions {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 14px;
+            color: #8ab;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        .boost-indicator {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 3px;
+        }
+
+        /* モーダル */
+        #modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 10, 25, 0.9);
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 25px var(--neon-blue);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            z-index: 10;
+            min-width: 280px;
+        }
+
+        #modal h2 {
+            margin-top: 0;
+            font-size: 32px;
+            text-shadow: 0 0 10px #fff;
+        }
+
+        #modal button {
+            background: transparent;
+            border: 2px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s ease;
+            margin-top: 20px;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+        }
+
+        #modal button:hover {
+            background: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CYBER SPIN</h1>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        
+        <!-- UIレイヤー -->
+        <div id="ui-overlay">
+            <div class="status-panel player-status">
+                <div>PLAYER (BLUE)</div>
+                <div class="bar-container">
+                    <div id="player-spin-bar" class="bar"></div>
+                </div>
+                <div id="player-boost" class="boost-indicator">BOOST: 3</div>
+            </div>
+            <div class="status-panel enemy-status">
+                <div>ENEMY (RED)</div>
+                <div class="bar-container">
+                    <div id="enemy-spin-bar" class="bar"></div>
+                </div>
+                <div id="enemy-boost" class="boost-indicator">BOOST: ACTIVE</div>
+            </div>
+        </div>
+
+        <!-- スタート/ゲームオーバー用モーダル -->
+        <div id="modal">
+            <h2 id="modal-title">READY?</h2>
+            <p id="modal-desc">自分のコマをドラッグして放し、シュートせよ！</p>
+            <button id="modal-btn" onclick="startGame()">START BATTLE</button>
+        </div>
+    </div>
+
+    <div id="instructions">
+        <strong>操作方法:</strong><br>
+        1. 青いコマを<strong>ドラッグして引っ張り</strong>、放してシュート！<br>
+        2. バトル中、画面を<strong>クリック/タップ</strong>で向いている方向にブースト突進！（最大3回）
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        const STATE_TITLE = 0;
+        const STATE_AIMING = 1;
+        const STATE_BATTLE = 2;
+        const STATE_GAMEOVER = 3;
+        
+        let gameState = STATE_TITLE;
+        let particles = [];
+        let sparks = [];
+
+        // スタジアム（お椀型）の設定
+        const STADIUM = {
+            centerX: 300,
+            centerY: 300,
+            radius: 260,       // スタジアムの内径
+            outRadius: 280,    // 完全に落下の外径
+            gravity: 0.045     // 中央へ引き寄せる傾斜重力の強さ
+        };
+
+        // コマのクラス定義
+        class Top {
+            constructor(x, y, color, isPlayer) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = 22;
+                this.color = color;
+                this.isPlayer = isPlayer;
+                
+                this.angle = 0;          // 回転角
+                this.spin = 0;           // 回転速度 (これが実質上のHP/寿命)
+                this.maxSpin = 15;       // 最大回転速度
+                this.mass = 1.2;         // 質量
+                
+                this.boostsLeft = 3;     // プレイヤー用ブースト回数
+                this.boostCooldown = 0;  // 被ブーストクールダウン
+                this.aiTimer = 0;        // 敵の行動AI用タイマー
+            }
+
+            shoot(vx, vy, spin) {
+                this.vx = vx;
+                this.vy = vy;
+                this.spin = spin;
+            }
+
+            update() {
+                // 1. 移動
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 2. 回転
+                this.angle += this.spin * 0.05;
+
+                // 3. 傾斜による中央への引き寄せ（すり鉢物理）
+                let dx = STADIUM.centerX - this.x;
+                let dy = STADIUM.centerY - this.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 10) {
+                    this.vx += (dx / dist) * STADIUM.gravity;
+                    this.vy += (dy / dist) * STADIUM.gravity;
+                }
+
+                // 4. 各種摩擦（空気抵抗 & 床摩擦）
+                this.vx *= 0.985;
+                this.vy *= 0.985;
+                
+                // スピンの自然減衰（回転が遅くなる）
+                this.spin = Math.max(0, this.spin - 0.012);
+
+                // クールダウン
+                if (this.boostCooldown > 0) this.boostCooldown--;
+                if (this.aiTimer > 0) this.aiTimer--;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                // 発光エフェクト
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+
+                // 外枠リング
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // コマの内部デザイン（回転がわかりやすいように模様をつける）
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 3方向のブレード（ツメ）
+                ctx.fillStyle = this.color;
+                for (let i = 0; i < 3; i++) {
+                    ctx.rotate((Math.PI * 2) / 3);
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.radius);
+                    ctx.lineTo(8, -10);
+                    ctx.lineTo(-8, -10);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // 中央のコア
+                ctx.fillStyle = "#fff";
+                ctx.beginPath();
+                ctx.arc(0, 0, 7, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            // ブースト機能（突進）
+            boost(targetX, targetY) {
+                if (this.boostsLeft <= 0 || this.spin < 2) return;
+                
+                let dx = targetX - this.x;
+                let dy = targetY - this.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist === 0) return;
+
+                // ターゲット方向へ急加速
+                this.vx += (dx / dist) * 12;
+                this.vy += (dy / dist) * 12;
+                
+                // ブースト使用代償として、少しスピンを削る
+                this.spin = Math.max(1, this.spin - 1.5);
+                this.boostsLeft--;
+                
+                if (this.isPlayer) {
+                    document.getElementById("player-boost").innerText = `BOOST: ${this.boostsLeft}`;
+                }
+
+                // 残像エフェクト生成
+                for (let i = 0; i < 8; i++) {
+                    particles.push(new Particle(this.x, this.y, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, this.color, 15));
+                }
+            }
+        }
+
+        // 火花・残像用エフェクトパーティクル
+        class Particle {
+            constructor(x, y, vx, vy, color, size) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.size = size;
+                this.alpha = 1;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.05 + 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+                return this.alpha > 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * this.alpha, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // ゲームオブジェクト
+        let player = new Top(180, 300, "#00f0ff", true);
+        let enemy = new Top(420, 300, "#ff007f", false);
+
+        // 引っ張り操作用
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let dragCurrent = { x: 0, y: 0 };
+
+        // 衝突判定と物理応答
+        function handleCollision(c1, c2) {
+            let dx = c2.x - c1.x;
+            let dy = c2.y - c1.y;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            let minDist = c1.radius + c2.radius;
+
+            if (dist < minDist) {
+                // 重なりの解消
+                let overlap = minDist - dist;
+                let nx = dx / dist;
+                let ny = dy / dist;
+                c1.x -= nx * overlap / 2;
+                c1.y -= ny * overlap / 2;
+                c2.x += nx * overlap / 2;
+                c2.y += ny * overlap / 2;
+
+                // 衝突ベクトル
+                let kx = c1.vx - c2.vx;
+                let ky = c1.vy - c2.vy;
+                let vn = kx * nx + ky * ny; // 法線方向の相対速度
+
+                if (vn > 0) { // 近づきつつある場合のみ反射
+                    let impulse = (2 * vn) / (c1.mass + c2.mass);
+                    let restitution = 0.85; // 反発係数
+
+                    c1.vx -= impulse * c2.mass * nx * restitution;
+                    c1.vy -= impulse * c2.mass * ny * restitution;
+                    c2.vx += impulse * c1.mass * nx * restitution;
+                    c2.vy += impulse * c1.mass * ny * restitution;
+
+                    // 回転速度（スピン）のダメージ計算
+                    // 衝突の衝撃が強いほどスピンが削られる
+                    let impactForce = Math.abs(vn);
+                    let spinDamage1 = impactForce * 0.25;
+                    let spinDamage2 = impactForce * 0.25;
+
+                    // 特殊ルール: 回転速度差によるアドバンテージ
+                    // スピンが多い方が、相手をより強く弾く
+                    let spinDiff = c1.spin - c2.spin;
+                    c1.vx -= nx * spinDiff * 0.15;
+                    c1.vy -= ny * spinDiff * 0.15;
+                    c2.vx += nx * spinDiff * 0.15;
+                    c2.vy += ny * spinDiff * 0.15;
+
+                    // スピンの減少
+                    c1.spin = Math.max(0, c1.spin - spinDamage1);
+                    c2.spin = Math.max(0, c2.spin - spinDamage2);
+
+                    // 火花エフェクトの生成
+                    let midX = (c1.x + c2.x) / 2;
+                    let midY = (c1.y + c2.y) / 2;
+                    for (let i = 0; i < 12; i++) {
+                        let speed = Math.random() * 6 + 2;
+                        let angle = Math.random() * Math.PI * 2;
+                        particles.push(new Particle(
+                            midX, midY, 
+                            Math.cos(angle) * speed + (c1.vx + c2.vx)*0.3, 
+                            Math.sin(angle) * speed + (c1.vy + c2.vy)*0.3, 
+                            "#ffcc00", 
+                            Math.random() * 4 + 2
+                        ));
+                    }
+                }
+            }
+        }
+
+        // 敵AIの行動パターン
+        function updateEnemyAI() {
+            if (gameState !== STATE_BATTLE) return;
+
+            // 1. ブーストAI (ときどきプレイヤーに狙いを定めて突進)
+            if (enemy.aiTimer <= 0 && enemy.spin > 4) {
+                let dx = player.x - enemy.x;
+                let dy = player.y - enemy.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                
+                // プレイヤーが近く、かつ敵の体勢が崩れていない時
+                if (dist < 200 && dist > 80 && Math.random() < 0.6) {
+                    enemy.boost(player.x, player.y);
+                }
+                enemy.aiTimer = Math.random() * 120 + 90; // 次の判定まで1.5〜3.5秒空ける
+            }
+        }
+
+        // スタジアム（土俵）の描画
+        function drawStadium() {
+            ctx.save();
+            // 外側の暗黒落下ゾーン
+            ctx.fillStyle = "#030307";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // スタジアム境界線の発光
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = "#ff2222";
+            ctx.strokeStyle = "#ff2222";
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.arc(STADIUM.centerX, STADIUM.centerY, STADIUM.radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 内側のリング模様
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.15)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(STADIUM.centerX, STADIUM.centerY, STADIUM.radius * 0.7, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(STADIUM.centerX, STADIUM.centerY, STADIUM.radius * 0.4, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // スタジアム中央のシンボルマーク
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.25)";
+            ctx.beginPath();
+            ctx.moveTo(STADIUM.centerX - 15, STADIUM.centerY);
+            ctx.lineTo(STADIUM.centerX + 15, STADIUM.centerY);
+            ctx.moveTo(STADIUM.centerX, STADIUM.centerY - 15);
+            ctx.lineTo(STADIUM.centerX, STADIUM.centerY + 15);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // モーダルの表示切り替え
+        function showModal(title, desc, btnText) {
+            document.getElementById("modal-title").innerText = title;
+            document.getElementById("modal-desc").innerText = desc;
+            document.getElementById("modal-btn").innerText = btnText;
+            document.getElementById("modal").style.display = "block";
+        }
+
+        function hideModal() {
+            document.getElementById("modal").style.display = "none";
+        }
+
+        // ゲーム初期化（リセット）
+        function initGame() {
+            player = new Top(180, 300, "#00f0ff", true);
+            enemy = new Top(420, 300, "#ff007f", false);
+            particles = [];
+            
+            document.getElementById("player-boost").innerText = `BOOST: 3`;
+            updateBars();
+            gameState = STATE_AIMING;
+            hideModal();
+        }
+
+        function startGame() {
+            if (gameState === STATE_TITLE || gameState === STATE_GAMEOVER) {
+                initGame();
+            }
+        }
+
+        // UI（HP/スピン残量バー）の更新
+        function updateBars() {
+            let pPercent = Math.max(0, (player.spin / player.maxSpin) * 100);
+            let ePercent = Math.max(0, (enemy.spin / enemy.maxSpin) * 100);
+            document.getElementById("player-spin-bar").style.width = pPercent + "%";
+            document.getElementById("enemy-spin-bar").style.width = ePercent + "%";
+        }
+
+        // 勝敗チェック
+        function checkGameOver() {
+            let pDist = Math.hypot(player.x - STADIUM.centerX, player.y - STADIUM.centerY);
+            let eDist = Math.hypot(enemy.x - STADIUM.centerX, enemy.y - STADIUM.centerY);
+
+            let playerOut = pDist > STADIUM.outRadius || player.spin <= 0.05;
+            let enemyOut = eDist > STADIUM.outRadius || enemy.spin <= 0.05;
+
+            if (playerOut && enemyOut) {
+                gameState = STATE_GAMEOVER;
+                showModal("DRAW", "両者ともに力尽きた！", "RETRY");
+            } else if (playerOut) {
+                gameState = STATE_GAMEOVER;
+                showModal("LOSE", "あなたのコマが力尽きた...", "RETRY");
+            } else if (enemyOut) {
+                gameState = STATE_GAMEOVER;
+                showModal("WIN!!", "敵のコマを完全クラッシュ！", "PLAY AGAIN");
+            }
+        }
+
+        // イベントリスナー（PC/スマホ両対応）
+        function getCanvasMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        canvas.addEventListener("mousedown", (e) => {
+            if (gameState !== STATE_AIMING) {
+                // バトル中のブースト発動
+                if (gameState === STATE_BATTLE) {
+                    let pos = getCanvasMousePos(e);
+                    player.boost(pos.x, pos.y);
+                }
+                return;
+            }
+            let pos = getCanvasMousePos(e);
+            let dist = Math.hypot(pos.x - player.x, pos.y - player.y);
+            // コマの近くをクリックしたらドラッグ開始
+            if (dist < 40) {
+                isDragging = true;
+                dragStart = { x: player.x, y: player.y };
+                dragCurrent = pos;
+            }
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+            dragCurrent = getCanvasMousePos(e);
+        });
+
+        window.addEventListener("mouseup", (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+
+            // 引っ張ったベクトルを反転して発射
+            let dx = dragStart.x - dragCurrent.x;
+            let dy = dragStart.y - dragCurrent.y;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // あまりに引っ張りが小さい場合はキャンセル
+            if (dist < 10) return;
+
+            // 最大引っ張り制限
+            let maxPull = 150;
+            if (dist > maxPull) {
+                dx = (dx / dist) * maxPull;
+                dy = (dy / dist) * maxPull;
+                dist = maxPull;
+            }
+
+            // 初速と回転を決定 (引っ張るほど速く、スピンが強くなる)
+            let powerRatio = dist / maxPull;
+            let shootVx = dx * 0.12;
+            let shootVy = dy * 0.12;
+            let startSpin = 5 + powerRatio * 10; // 最大15
+
+            player.shoot(shootVx, shootVy, startSpin);
+
+            // 敵も同時にシュート（少しだけプレイヤーの進路を狙う）
+            let enemyAngle = Math.atan2(player.y - enemy.y, player.x - enemy.x) + (Math.random() - 0.5) * 0.5;
+            let enemyPower = 6 + Math.random() * 6;
+            enemy.shoot(
+                Math.cos(enemyAngle) * enemyPower, 
+                Math.sin(enemyAngle) * enemyPower, 
+                10 + Math.random() * 5
+            );
+
+            gameState = STATE_BATTLE;
+        });
+
+        // タッチイベント用（スマホ対応）
+        canvas.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            canvas.dispatchEvent(new MouseEvent("mousedown", {
+                clientX: e.touches[0].clientX,
+                clientY: e.touches[0].clientY
+            }));
+        }, {passive: false});
+
+        canvas.addEventListener("touchmove", (e) => {
+            e.preventDefault();
+            canvas.dispatchEvent(new MouseEvent("mousemove", {
+                clientX: e.touches[0].clientX,
+                clientY: e.touches[0].clientY
+            }));
+        }, {passive: false});
+
+        canvas.addEventListener("touchend", (e) => {
+            e.preventDefault();
+            window.dispatchEvent(new MouseEvent("mouseup", {}));
+        }, {passive: false});
+
+
+        // メインループ
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. 背景・スタジアム描画
+            drawStadium();
+
+            // 2. アップデート & 衝突処理
+            if (gameState === STATE_BATTLE) {
+                player.update();
+                enemy.update();
+                updateEnemyAI();
+                handleCollision(player, enemy);
+                updateBars();
+                checkGameOver();
+            }
+
+            // 3. コマの描画
+            player.draw();
+            enemy.draw();
+
+            // 4. ドラッグ時の照準線・矢印描画
+            if (gameState === STATE_AIMING && isDragging) {
+                let dx = dragStart.x - dragCurrent.x;
+                let dy = dragStart.y - dragCurrent.y;
+                
+                // ガイドライン
+                ctx.save();
+                ctx.strokeStyle = "rgba(0, 240, 255, 0.6)";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.x + dx, player.y + dy);
+                ctx.stroke();
+
+                // 予測先端にサークル
+                ctx.restore();
+                ctx.save();
+                ctx.fillStyle = "var(--neon-blue)";
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = "var(--neon-blue)";
+                ctx.beginPath();
+                ctx.arc(player.x + dx, player.y + dy, 6, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 5. パーティクルの処理
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                if (p.update()) {
+                    p.draw();
+                } else {
+                    particles.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        // 初期モーダル表示
+        showModal("CYBER SPIN", "自分のコマをドラッグして放し、シュートせよ！", "PLAY");
+        loop();
+    </script>
+</body>
+</html>
