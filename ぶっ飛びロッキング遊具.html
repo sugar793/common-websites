@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ぶっ飛びロッキング遊具</title>
+  <style>
+    :root {
+      --primary-color: #ff8c00;
+      --bg-color-1: #a0eaff;
+      --bg-color-2: #d0f0ff;
+    }
+
+    body {
+      text-align: center;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(var(--bg-color-1), var(--bg-color-2));
+      margin: 0;
+      padding: 20px 10px 40px;
+      user-select: none;
+      color: #333;
+    }
+
+    h1 {
+      margin: 10px 0;
+      font-size: 24px;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+    }
+
+    /* ステータスバー */
+    .dashboard {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 10px;
+      border-radius: 12px;
+      max-width: 500px;
+      margin: 0 auto 15px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+
+    .stat-item {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .stat-value {
+      color: #e63946;
+      font-size: 16px;
+    }
+
+    #rocking {
+      margin: 30px auto;
+      width: 240px;
+      height: 173px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      transform-origin: center center;
+      transition: transform 0.05s linear;
+      filter: drop-shadow(0px 15px 10px rgba(0, 0, 0, 0.2));
+    }
+
+    #pressBtn {
+      font-size: 22px;
+      font-weight: bold;
+      padding: 16px 36px;
+      cursor: pointer;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      box-shadow: 0 6px 0 #c76d00, 0 10px 15px rgba(0, 0, 0, 0.2);
+      transition: all 0.1s;
+      outline: none;
+    }
+
+    #pressBtn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #c76d00, 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    #message {
+      font-size: 18px;
+      font-weight: bold;
+      color: #e63946;
+      margin-top: 10px;
+      height: 24px;
+    }
+
+    #speedBarContainer {
+      width: 280px;
+      height: 18px;
+      background: #e0e0e0;
+      margin: 15px auto;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #bbb;
+    }
+
+    #speedBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #00f260, #ff0844);
+      transition: width 0.05s;
+    }
+
+    #distanceDisplay {
+      font-size: 16px;
+      font-weight: bold;
+      height: 24px;
+    }
+
+    /* ショップ＆実績のパネル */
+    .panel-container {
+      max-width: 500px;
+      margin: 20px auto;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 16px;
+      padding: 15px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .tab-btn.active {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .shop-item, .achievement-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #eee;
+    }
+
+    .item-info {
+      text-align: left;
+    }
+
+    .item-title {
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .item-desc {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .buy-btn {
+      padding: 8px 12px;
+      background: #2ec4b6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .buy-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .skin-selector {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .skin-card {
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      padding: 8px;
+      cursor: pointer;
+      background: white;
+      flex: 1;
+    }
+
+    .skin-card.selected {
+      border-color: var(--primary-color);
+      background: #fff8f0;
+    }
+
+    /* 画面右下の小型リセットボタン */
+    #resetBtn {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      font-size: 11px;
+      padding: 5px 10px;
+      background: rgba(0, 0, 0, 0.2);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #resetBtn:hover {
+      background: rgba(220, 53, 69, 0.8);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🚀 ぶっ飛びロッキング遊具</h1>
+
+  <!-- ステータスダッシュボード -->
+  <div class="dashboard">
+    <div class="stat-item">💰 コイン: <span id="coinDisplay" class="stat-value">0</span></div>
+    <div class="stat-item">🏆 最高記録: <span id="highScoreDisplay" class="stat-value">0</span>px</div>
+    <div class="stat-item">飛行回数: <span id="flyCountDisplay" class="stat-value">0</span></div>
+  </div>
+
+  <div id="rocking"></div>
+  <button id="pressBtn">連打で回す！</button>
+
+  <div id="speedBarContainer"><div id="speedBar"></div></div>
+  <div id="distanceDisplay"></div>
+  <div id="message"></div>
+
+  <!-- やりこみパネル -->
+  <div class="panel-container">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('shop')">🛒 強化</button>
+      <button class="tab-btn" onclick="switchTab('skins')">🎨 スキン</button>
+      <button class="tab-btn" onclick="switchTab('achievements')">🏅 実績</button>
+    </div>
+
+    <!-- ショップ -->
+    <div id="shop" class="tab-content active">
+      <div class="shop-item">
+        <div class="item-info">
+          <div class="item-title">腕力強化 (Lv.<span id="tapPowerLv">1</span>)</div>
+          <div class="item-desc">1タップの加速量がアップ (+4%)</div>
+        </div>
+        <button class="buy-btn" id="buyTapPower" onclick="buyUpgrade('tapPower')">100 💰</button>
+      </div>
+      <div class="shop-item">
+        <div class="item-info">
+          <div class="item-title">ベアリング滑らか化 (Lv.<span id="frictionLv">1</span>)</div>
+          <div class="item-desc">回転が減速しにくくなる</div>
+        </div>
+        <button class="buy-btn" id="buyFriction" onclick="buyUpgrade('friction')">150 💰</button>
+      </div>
+      <div class="shop-item">
+        <div class="item-info">
+          <div class="item-title">ジェットエンジン (Lv.<span id="boostLv">1</span>)</div>
+          <div class="item-desc">飛距離の倍率がアップ (+10%)</div>
+        </div>
+        <button class="buy-btn" id="buyBoost" onclick="buyUpgrade('boost')">200 💰</button>
+      </div>
+    </div>
+
+    <!-- スキン -->
+    <div id="skins" class="tab-content">
+      <div class="skin-selector">
+        <div class="skin-card selected" id="skin-normal" onclick="selectSkin('normal')">
+          <div>🐼 ノーマル</div>
+          <small>初期装備</small>
+        </div>
+        <div class="skin-card" id="skin-gold" onclick="selectSkin('gold')">
+          <div>✨ ゴールデン</div>
+          <small id="skin-gold-status">1,000 💰</small>
+        </div>
+        <div class="skin-card" id="skin-cyber" onclick="selectSkin('cyber')">
+          <div>⚡ ネオン</div>
+          <small id="skin-cyber-status">5,000 💰</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- 実績 -->
+    <div id="achievements" class="tab-content">
+      <div id="achievementList"></div>
+    </div>
+  </div>
+
+  <!-- リセットボタン -->
+  <button id="resetBtn" onclick="resetGame()">データリセット</button>
+
+  <audio id="spinSound" src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Buttonclick02.ogg"></audio>
+  <audio id="flySound" src="https://upload.wikimedia.org/wikipedia/commons/9/97/Whoosh.ogg"></audio>
+
+  <script>
+    const SKINS = {
+      normal: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 217'%3E%3Cg stroke='%23555' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M 150,210 L 130,195 L 170,180 L 130,165 L 170,150 L 150,135' /%3E%3C/g%3E%3Cpath d='M 90,135 L 210,135' stroke='%23333' stroke-width='6' stroke-linecap='round' /%3E%3Cellipse cx='185' cy='120' rx='20' ry='25' fill='%23222' /%3E%3Cellipse cx='145' cy='105' rx='45' ry='35' fill='%23fff' stroke='%23222' stroke-width='4' /%3E%3Cpath d='M 115,85 C 105,100 105,120 115,130 C 125,130 130,110 125,90 Z' fill='%23222' /%3E%3Ccircle cx='105' cy='70' r='30' fill='%23fff' stroke='%23222' stroke-width='4' /%3E%3Ccircle cx='85' cy='45' r='12' fill='%23222' /%3E%3Ccircle cx='120' cy='45' r='12' fill='%23222' /%3E%3Cellipse cx='95' cy='68' rx='8' ry='11' fill='%23222' transform='rotate(-10 95 68)' /%3E%3Ccircle cx='95' cy='66' r='2.5' fill='%23fff' /%3E%3Cpolygon points='100,78 106,78 103,82' fill='%23222' /%3E%3Cpath d='M 95,65 L 85,50' stroke='%23e63946' stroke-width='6' stroke-linecap='round' /%3E%3Ccircle cx='85' cy='50' r='7' fill='%23e63946' /%3E%3Ccircle cx='125' cy='125' r='6' fill='%23666' /%3E%3C/svg%3E",
+      gold: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 217'%3E%3Cg stroke='%23b8860b' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M 150,210 L 130,195 L 170,180 L 130,165 L 170,150 L 150,135' /%3E%3C/g%3E%3Cpath d='M 90,135 L 210,135' stroke='%23b8860b' stroke-width='6' stroke-linecap='round' /%3E%3Cellipse cx='185' cy='120' rx='20' ry='25' fill='%23d4af37' /%3E%3Cellipse cx='145' cy='105' rx='45' ry='35' fill='%23ffd700' stroke='%23b8860b' stroke-width='4' /%3E%3Cpath d='M 115,85 C 105,100 105,120 115,130 C 125,130 130,110 125,90 Z' fill='%23d4af37' /%3E%3Ccircle cx='105' cy='70' r='30' fill='%23ffd700' stroke='%23b8860b' stroke-width='4' /%3E%3Ccircle cx='85' cy='45' r='12' fill='%23d4af37' /%3E%3Ccircle cx='120' cy='45' r='12' fill='%23d4af37' /%3E%3Cellipse cx='95' cy='68' rx='8' ry='11' fill='%23d4af37' transform='rotate(-10 95 68)' /%3E%3Ccircle cx='95' cy='66' r='2.5' fill='%23fff' /%3E%3Cpolygon points='100,78 106,78 103,82' fill='%23555' /%3E%3Cpath d='M 95,65 L 85,50' stroke='%23ff4500' stroke-width='6' stroke-linecap='round' /%3E%3Ccircle cx='85' cy='50' r='7' fill='%23ff4500' /%3E%3Ccircle cx='125' cy='125' r='6' fill='%23b8860b' /%3E%3C/svg%3E",
+      cyber: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 217'%3E%3Cg stroke='%2300f3ff' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M 150,210 L 130,195 L 170,180 L 130,165 L 170,150 L 150,135' /%3E%3C/g%3E%3Cpath d='M 90,135 L 210,135' stroke='%23ff00ff' stroke-width='6' stroke-linecap='round' /%3E%3Cellipse cx='185' cy='120' rx='20' ry='25' fill='%23ff00ff' /%3E%3Cellipse cx='145' cy='105' rx='45' ry='35' fill='%23111122' stroke='%2300f3ff' stroke-width='4' /%3E%3Cpath d='M 115,85 C 105,100 105,120 115,130 C 125,130 130,110 125,90 Z' fill='%23ff00ff' /%3E%3Ccircle cx='105' cy='70' r='30' fill='%23111122' stroke='%2300f3ff' stroke-width='4' /%3E%3Ccircle cx='85' cy='45' r='12' fill='%2300f3ff' /%3E%3Ccircle cx='120' cy='45' r='12' fill='%2300f3ff' /%3E%3Cellipse cx='95' cy='68' rx='8' ry='11' fill='%23ff00ff' transform='rotate(-10 95 68)' /%3E%3Ccircle cx='95' cy='66' r='2.5' fill='%2300f3ff' /%3E%3Cpolygon points='100,78 106,78 103,82' fill='%2300f3ff' /%3E%3Cpath d='M 95,65 L 85,50' stroke='%23ff00ff' stroke-width='6' stroke-linecap='round' /%3E%3Ccircle cx='85' cy='50' r='7' fill='%2300f3ff' /%3E%3Ccircle cx='125' cy='125' r='6' fill='%2300f3ff' /%3E%3C/svg%3E"
+    };
+
+    let state = {
+      coins: 0,
+      highScore: 0,
+      flyCount: 0,
+      totalDistance: 0,
+      upgrades: {
+        tapPower: 1,
+        friction: 1,
+        boost: 1
+      },
+      skins: {
+        normal: true,
+        gold: false,
+        cyber: false
+      },
+      currentSkin: 'normal',
+      achievements: {}
+    };
+
+    const saved = localStorage.getItem("rockingGameData");
+    if (saved) {
+      state = Object.assign(state, JSON.parse(saved));
+    }
+
+    const ACHIEVEMENT_DEFS = [
+      { id: 'first_fly', title: '初フライト', desc: '1回ぶっ飛ぶ', reward: 50, check: () => state.flyCount >= 1 },
+      { id: 'fly_10', title: 'ベテランパイロット', desc: '10回ぶっ飛ぶ', reward: 200, check: () => state.flyCount >= 10 },
+      { id: 'dist_2000', title: '大空へ', desc: '1回の飛距離2,000px達成', reward: 300, check: () => state.highScore >= 2000 },
+      { id: 'dist_5000', title: '宇宙到達', desc: '1回の飛距離5,000px達成', reward: 800, check: () => state.highScore >= 5000 },
+      { id: 'total_30000', title: '地球何周分？', desc: '累計飛距離30,000px達成', reward: 1200, check: () => state.totalDistance >= 30000 }
+    ];
+
+    const rocking = document.getElementById('rocking');
+    const button = document.getElementById('pressBtn');
+    const message = document.getElementById('message');
+    const speedBar = document.getElementById('speedBar');
+    const distanceDisplay = document.getElementById('distanceDisplay');
+
+    const coinDisplay = document.getElementById('coinDisplay');
+    const highScoreDisplay = document.getElementById('highScoreDisplay');
+    const flyCountDisplay = document.getElementById('flyCountDisplay');
+
+    const spinSound = document.getElementById('spinSound');
+    const flySound = document.getElementById('flySound');
+
+    let angle = 0;
+    let angularVelocity = 0;
+    let flying = false;
+
+    const FLY_TRIGGER_SPEED = 40;
+
+    function saveGame() {
+      localStorage.setItem("rockingGameData", JSON.stringify(state));
+    }
+
+    function resetGame() {
+      if (confirm('ゲームデータをリセットしますか？（セーブデータが全て消去されます）')) {
+        localStorage.removeItem("rockingGameData");
+        location.reload();
+      }
+    }
+
+    function updateUI() {
+      coinDisplay.textContent = Math.floor(state.coins);
+      highScoreDisplay.textContent = state.highScore;
+      flyCountDisplay.textContent = state.flyCount;
+
+      ['tapPower', 'friction', 'boost'].forEach(type => {
+        const lv = state.upgrades[type];
+        const cost = getUpgradeCost(type, lv);
+        document.getElementById(`${type}Lv`).textContent = lv;
+        const btn = document.getElementById(`buy${type.charAt(0).toUpperCase() + type.slice(1)}`);
+        btn.textContent = `${cost} 💰`;
+        btn.disabled = state.coins < cost;
+      });
+
+      rocking.style.backgroundImage = `url("${SKINS[state.currentSkin]}")`;
+      document.querySelectorAll('.skin-card').forEach(el => el.classList.remove('selected'));
+      document.getElementById(`skin-${state.currentSkin}`).classList.add('selected');
+
+      document.getElementById('skin-gold-status').textContent = state.skins.gold ? "所持中" : "1,000 💰";
+      document.getElementById('skin-cyber-status').textContent = state.skins.cyber ? "所持中" : "5,000 💰";
+
+      renderAchievements();
+    }
+
+    function getUpgradeCost(type, level) {
+      const baseCosts = { tapPower: 100, friction: 150, boost: 200 };
+      return Math.floor(baseCosts[type] * Math.pow(1.4, level - 1));
+    }
+
+    function buyUpgrade(type) {
+      const cost = getUpgradeCost(type, state.upgrades[type]);
+      if (state.coins >= cost) {
+        state.coins -= cost;
+        state.upgrades[type]++;
+        saveGame();
+        updateUI();
+      }
+    }
+
+    function selectSkin(skinKey) {
+      const costs = { gold: 1000, cyber: 5000 };
+      if (!state.skins[skinKey]) {
+        if (state.coins >= costs[skinKey]) {
+          state.coins -= costs[skinKey];
+          state.skins[skinKey] = true;
+        } else {
+          alert('コインが足りません！');
+          return;
+        }
+      }
+      state.currentSkin = skinKey;
+      saveGame();
+      updateUI();
+    }
+
+    function checkAchievements() {
+      ACHIEVEMENT_DEFS.forEach(ach => {
+        if (!state.achievements[ach.id] && ach.check()) {
+          state.achievements[ach.id] = true;
+          state.coins += ach.reward;
+          message.textContent = `🏅 実績解除: ${ach.title} (+${ach.reward}💰)`;
+        }
+      });
+    }
+
+    function renderAchievements() {
+      const list = document.getElementById('achievementList');
+      list.innerHTML = '';
+      ACHIEVEMENT_DEFS.forEach(ach => {
+        const done = state.achievements[ach.id];
+        const item = document.createElement('div');
+        item.className = 'achievement-item';
+        item.style.opacity = done ? '1' : '0.5';
+        item.innerHTML = `
+          <div class="item-info">
+            <div class="item-title">${done ? '✅ ' : '🔒 '}${ach.title}</div>
+            <div class="item-desc">${ach.desc}</div>
+          </div>
+          <div style="font-weight:bold; color: #ff8c00;">+${ach.reward} 💰</div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    function animate() {
+      if (!flying) {
+        angle += angularVelocity;
+        
+        // 初期状態は硬め（0.98で減速が早い）。Lvアップごとにマイルドに伸びる (+0.001/Lv)
+        const frictionFactor = 0.98 + (state.upgrades.friction - 1) * 0.001;
+        angularVelocity *= Math.min(frictionFactor, 0.993);
+
+        rocking.style.transform = `rotate(${angle}deg)`;
+
+        const percent = Math.min(angularVelocity / FLY_TRIGGER_SPEED, 1) * 100;
+        speedBar.style.width = `${percent}%`;
+
+        if (angularVelocity >= FLY_TRIGGER_SPEED) {
+          flyAway();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function flyAway() {
+      flying = true;
+      state.flyCount++;
+
+      const angleDeg = 45 + Math.random() * 90;  
+      const rad = angleDeg * Math.PI / 180;
+      
+      // ブースト倍率は少し小ぶりに (+10%/Lv)
+      const boostMultiplier = 1 + (state.upgrades.boost - 1) * 0.10;
+      const basePower = 40 * 40;
+      const distance = Math.round(basePower * boostMultiplier * (0.8 + Math.random() * 0.4));
+
+      const earnedCoins = Math.floor(distance / 10);
+      state.coins += earnedCoins;
+      state.totalDistance += distance;
+
+      let isNewRecord = false;
+      if (distance > state.highScore) {
+        state.highScore = distance;
+        isNewRecord = true;
+      }
+
+      flySound.currentTime = 0;
+      flySound.play();
+
+      const dx = Math.cos(rad) * (distance / 2);
+      const dy = Math.sin(rad) * (distance / 2);
+
+      rocking.style.transition = 'transform 1s ease-out';
+      rocking.style.transform = `translate(${dx}px, ${-dy}px) rotate(${angle + 1440}deg)`;
+
+      message.textContent = isNewRecord ? '🎉 新記録達成！！ ぶっ飛んだー！！' : 'ぶっ飛んだー！！';
+      distanceDisplay.textContent = `飛距離: ${distance}px (+${earnedCoins}💰)`;
+
+      checkAchievements();
+      saveGame();
+      updateUI();
+
+      setTimeout(() => {
+        rocking.style.transition = 'transform 1s ease-in';
+        rocking.style.transform = 'translate(0, 0) rotate(0deg)';
+      }, 1200);
+
+      setTimeout(() => {
+        angle = 0;
+        angularVelocity = 0;
+        flying = false;
+        message.textContent = '戻ってきたよ！';
+        distanceDisplay.textContent = '';
+        rocking.style.transition = '';  
+      }, 2400);
+    }
+
+    button.addEventListener('click', () => {
+      if (flying) return;
+      // 初期加算量を3~6に下げ、強化率も+4%/Lvに抑える
+      const powerMultiplier = 1 + (state.upgrades.tapPower - 1) * 0.04;
+      angularVelocity += (3 + Math.random() * 3) * powerMultiplier;
+      
+      spinSound.currentTime = 0;
+      spinSound.play();
+      message.textContent = '';
+    });
+
+    button.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      button.click();
+    });
+
+    updateUI();
+    animate();
+  </script>
+</body>
+</html>
