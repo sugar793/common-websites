@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>迷路鬼ごっこ（中級）</title>
+<title>迷路鬼ごっこ（初級・修正済み）</title>
 <style>
   body {
     margin: 0;
@@ -136,12 +136,13 @@ function drawLine(x1,y1,x2,y2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y
 function index(x,y){if(x<0||y<0||x>=cols||y>=rows)return-1;return x+y*cols;}
 function removeWalls(a,b){const dx=a.x-b.x;const dy=a.y-b.y;if(dx===1){a.walls[3]=false;b.walls[1]=false}else if(dx===-1){a.walls[1]=false;b.walls[3]=false}if(dy===1){a.walls[0]=false;b.walls[2]=false}else if(dy===-1){a.walls[2]=false;b.walls[0]=false}}
 
-function generateMaze(){grid=[];stack=[];for(let y=0;y<rows;y++){for(let x=0;x<cols;x++){grid.push(new Cell(x,y))}}current=grid[0];return new Promise(resolve=>{genInterval=setInterval(()=>{ctx.clearRect(0,0,canvas.width,canvas.height);grid.forEach(c=>c.show());current.visited=true;let neighbors=[];const dirs=[[0,-1],[1,0],[0,1],[-1,0]];for(let [dx,dy] of dirs){const neighbor=grid[index(current.x+dx,current.y+dy)];if(neighbor&&!neighbor.visited)neighbors.push(neighbor)}if(neighbors.length>0){const next=neighbors[Math.floor(Math.random()*neighbors.length)];stack.push(current);removeWalls(current,next);current=next}else if(stack.length>0){current=stack.pop()}else{clearInterval(genInterval);resolve()}},10)})}
-
+// アニメーション速度を10ms -> 2msに変更
+function generateMaze(){grid=[];stack=[];for(let y=0;y<rows;y++){for(let x=0;x<cols;x++){grid.push(new Cell(x,y))}}current=grid[0];return new Promise(resolve=>{genInterval=setInterval(()=>{ctx.clearRect(0,0,canvas.width,canvas.height);grid.forEach(c=>c.show());current.visited=true;let neighbors=[];const dirs=[[0,-1],[1,0],[0,1],[-1,0]];for(let [dx,dy] of dirs){const neighbor=grid[index(current.x+dx,current.y+dy)];if(neighbor&&!neighbor.visited)neighbors.push(neighbor)}if(neighbors.length>0){const next=neighbors[Math.floor(Math.random()*neighbors.length)];stack.push(current);removeWalls(current,next);current=next}else if(stack.length>0){current=stack.pop()}else{clearInterval(genInterval);resolve()}},1)})}
 async function generateMazeUntilPathLongEnough(minLength=110){while(true){await generateMaze();const path=bfs(start,goal);if(path.length>=minLength){shortestPath=[];startGame();break;}}}
 
 let player={x:0,y:0};
-let onis=[{x:cols-1,y:rows-1},{x:0,y:rows-1}];
+// 鬼を1体に変更
+let onis=[{x:cols-1,y:rows-1}];
 let oniMoveCounter=0,oniMoveInterval=50,oniActive=false,gameOver=false,startTime,timerInterval;
 
 function startGame(){player.x=start.x;player.y=start.y;canMove=true;oniActive=false;setTimeout(()=>{oniActive=true},1000);startTime=Date.now();timerInterval=setInterval(()=>{const elapsed=(Date.now()-startTime)/1000;document.getElementById("timer").textContent=elapsed.toFixed(1);saveReplayStep()},100);loadRanking();document.getElementById("streak").textContent=streak;requestAnimationFrame(gameLoop)}
@@ -161,7 +162,7 @@ function showModal(message){document.getElementById("modal-message").innerHTML=m
 function restartGame(){location.reload();}
 function showShortestPath(){shortestPath=bfs(player,goal);}
 
-// キー押下表示 
+// キー押下表示
 const pressedKeys={};
 function updateKeyDisplay(){["w","a","s","d","ArrowUp","ArrowLeft","ArrowDown","ArrowRight"].forEach(k=>{const idMap={"w":"key-w","a":"key-a","s":"key-s","d":"key-d","ArrowUp":"key-up","ArrowLeft":"key-left","ArrowDown":"key-down","ArrowRight":"key-right"};const el=document.getElementById(idMap[k]);if(el){if(pressedKeys[k]) el.classList.add("pressed");else el.classList.remove("pressed");}})}
 document.addEventListener("keydown",e=>{if(!canMove||gameOver)return;pressedKeys[e.key]=true;updateKeyDisplay();const cell=grid[index(player.x,player.y)];if(e.key=="ArrowUp"||e.key=="w"){if(!cell.walls[0])player.y--;}else if(e.key=="ArrowDown"||e.key=="s"){if(!cell.walls[2])player.y++;}else if(e.key=="ArrowLeft"||e.key=="a"){if(!cell.walls[3])player.x--;}else if(e.key=="ArrowRight"||e.key=="d"){if(!cell.walls[1])player.x++;}});
