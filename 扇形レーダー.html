@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+   <meta charset="UTF-8">
+   <title>超音波センサー レーダー可視化ツール</title>
+   <style>
+       body {
+           background-color: #0b0f19;
+           color: #00ff66;
+           font-family: 'Courier New', Courier, monospace, "Helvetica Neue", Arial, sans-serif;
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           padding: 20px;
+           margin: 0;
+       }
+       h1 {
+           margin-bottom: 20px;
+           text-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+           font-size: 24px;
+           letter-spacing: 2px;
+       }
+       .container {
+           display: flex;
+           gap: 25px;
+           width: 100%;
+           max-width: 1200px;
+           flex-wrap: wrap;
+       }
+       .control-panel {
+           flex: 1;
+           min-width: 300px;
+           background: #111827;
+           padding: 20px;
+           border-radius: 12px;
+           border: 1px solid #00ff66;
+           box-shadow: 0 0 15px rgba(0, 255, 102, 0.1);
+       }
+       .display-panel {
+           flex: 2;
+           min-width: 500px;
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           background: #000;
+           padding: 15px;
+           border-radius: 12px;
+           border: 1px solid #00ff66;
+           box-shadow: 0 0 20px rgba(0, 255, 102, 0.15);
+       }
+       h3 {
+           margin-top: 0;
+           color: #fff;
+           border-bottom: 1px solid #334155;
+           padding-bottom: 8px;
+       }
+       textarea {
+           width: 100%;
+           height: 220px;
+           background: #030712;
+           color: #38bdf8;
+           border: 1px solid #334155;
+           border-radius: 6px;
+           padding: 10px;
+           box-sizing: border-box;
+           font-family: monospace;
+           font-size: 13px;
+           resize: vertical;
+       }
+       textarea:focus {
+           outline: none;
+           border-color: #00ff66;
+       }
+       button {
+           background: #00ff66;
+           color: #000;
+           border: none;
+           padding: 12px 20px;
+           font-size: 16px;
+           font-weight: bold;
+           cursor: pointer;
+           margin-top: 15px;
+           width: 100%;
+           border-radius: 6px;
+           transition: all 0.2s;
+       }
+       button:hover {
+           background: #33ff88;
+           box-shadow: 0 0 15px rgba(0,255,102,0.6);
+           transform: translateY(-1px);
+       }
+       canvas {
+           background: #020617;
+           width: 100%;
+           max-width: 700px;
+           height: auto;
+       }
+       .label {
+           margin-top: 15px;
+           font-weight: bold;
+           color: #94a3b8;
+           font-size: 14px;
+       }
+       select, input {
+           background: #030712;
+           color: #00ff66;
+           border: 1px solid #334155;
+           padding: 8px;
+           margin-top: 5px;
+           width: 100%;
+           box-sizing: border-box;
+           border-radius: 6px;
+       }
+       select:focus, input:focus {
+           outline: none;
+           border-color: #00ff66;
+       }
+       .info {
+           font-size: 12px;
+           color: #64748b;
+           margin-bottom: 10px;
+           line-height: 1.4;
+       }
+   </style>
+</head>
+<body>
+
+
+<h1>ULTRASONIC RADAR MONITOR</h1>
+
+
+<div class="container">
+   <div class="control-panel">
+       <h3>1. データの貼り付け</h3>
+       <p class="info">
+           スプレッドシートの<b>「位置」と「距離(cm)」の2つの列</b>をドラッグしてコピーし、そのまま下の枠内に貼り付けてください（自動で感知します）。
+       </p>
+       <textarea id="dataInput" placeholder="例（スプレッドシートからコピペ）：&#10;1  22.47&#10;2 22.47&#10;3 22.47&#10;..."></textarea>
+      
+       <h3>2. グラフ設定</h3>
+       <div class="label">角度のマッピング方法:</div>
+       <select id="angleMode">
+           <option value="scale">データの「最小位置〜最大位置」を「0度〜180度」の扇形に広げる</option>
+           <option value="direct">「位置」の数値をそのまま「角度（度）」として扱う</option>
+           <option value="scale360">「最小位置〜最大位置」を「0度〜360度（全円）」に広げる</option>
+       </select>
+
+
+       <div class="label">最大表示距離 (cm):</div>
+       <input type="number" id="maxDistanceInput" value="30" min="5" max="500">
+      
+       <button id="drawBtn">レーダーを描画する</button>
+   </div>
+  
+   <div class="display-panel">
+       <canvas id="radarCanvas" width="700" height="450"></canvas>
+   </div>
+</div>
+
+
+<script>
+const canvas = document.getElementById('radarCanvas');
+const ctx = canvas.getContext('2d');
+const dataInput = document.getElementById('dataInput');
+const angleMode = document.getElementById('angleMode');
+const maxDistanceInput = document.getElementById('maxDistanceInput');
+const drawBtn = document.getElementById('drawBtn');
+
+
+// 初期状態のサンプルデータ（ご提示いただいたデータの一部）
+dataInput.value = ``;
+
+
+function drawRadar(points, maxDist, mode) {
+   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+   const is360 = (mode === 'scale360');
+  
+   // 中心座標とレーダーの最大半径を設定
+   let cx = canvas.width / 2;
+   let cy = is360 ? canvas.height / 2 : canvas.height - 50;
+   let maxRadius = is360 ? Math.min(canvas.width, canvas.height) / 2 - 40 : canvas.height - 90;
+  
+   // --- 1. 背景のレーダーグリッド（目盛り）を描画 ---
+   ctx.strokeStyle = 'rgba(0, 255, 102, 0.15)';
+   ctx.fillStyle = 'rgba(0, 255, 102, 0.6)';
+   ctx.font = '11px monospace';
+   ctx.lineWidth = 1;
+  
+   // 同心円（距離目盛り）の描画
+   const circles = 4;
+   for(let i = 1; i <= circles; i++) {
+       let r = (maxRadius / circles) * i;
+       let d = (maxDist / circles) * i;
+      
+       ctx.beginPath();
+       if (is360) {
+           ctx.arc(cx, cy, r, 0, Math.PI * 2);
+       } else {
+           ctx.arc(cx, cy, r, Math.PI, 0); // 180度の扇形
+       }
+       ctx.stroke();
+      
+       // 距離の数字テキスト
+       ctx.textAlign = 'left';
+       ctx.fillText(`${d.toFixed(1)}cm`, cx + r * Math.cos(45 * Math.PI / 180), cy - r * Math.sin(45 * Math.PI / 180));
+   }
+  
+   // 放射線（角度目盛り）の描画
+   const step = is360 ? 30 : 15;
+   const startAngle = is360 ? 0 : 0;
+   const endAngle = is360 ? 360 : 180;
+  
+   for(let a = startAngle; a <= endAngle; a += step) {
+       let rad = a * Math.PI / 180;
+       let x = cx + maxRadius * Math.cos(rad);
+       let y = cy - maxRadius * Math.sin(rad);
+      
+       ctx.beginPath();
+       ctx.moveTo(cx, cy);
+       ctx.lineTo(x, y);
+       ctx.strokeStyle = 'rgba(0, 255, 102, 0.1)';
+       ctx.stroke();
+      
+       // 角度の数字テキスト
+       let lx = cx + (maxRadius + 18) * Math.cos(rad);
+       let ly = cy - (maxRadius + 18) * Math.sin(rad);
+       ctx.textAlign = 'center';
+       ctx.textBaseline = 'middle';
+       ctx.fillText(`${a}°`, lx, ly);
+   }
+  
+   // 扇形の底辺の閉じる線（180度モード用）
+   if (!is360) {
+       ctx.beginPath();
+       ctx.moveTo(cx - maxRadius, cy);
+       ctx.lineTo(cx + maxRadius, cy);
+       ctx.strokeStyle = 'rgba(0, 255, 102, 0.3)';
+       ctx.stroke();
+   }
+
+
+   if (points.length === 0) return;
+  
+   // --- 2. データのプロットと変形処理 ---
+   let minP = Math.min(...points.map(p => p.pos));
+   let maxP = Math.max(...points.map(p => p.pos));
+   if (minP === maxP) maxP = minP + 1;
+  
+   let processedPoints = points.map(p => {
+       let angle_deg = 0;
+       if (mode === 'scale') {
+           // 位置の最小〜最大を 0〜180度に綺麗にマッピング
+           angle_deg = ((p.pos - minP) / (maxP - minP)) * 180;
+       } else if (mode === 'scale360') {
+           // 0〜360度にマッピング
+           angle_deg = ((p.pos - minP) / (maxP - minP)) * 360;
+       } else {
+           // 位置の数値をそのまま角度にする
+           angle_deg = p.pos;
+       }
+      
+       // サーボモーターの回転に合わせて、右（0度）から上（90度）を通って左（180度）へ動く極座標に変換
+       let rad = angle_deg * Math.PI / 180;
+       let r = (p.dist / maxDist) * maxRadius;
+      
+       // 描画範囲外のクリッピング処理
+       if (r > maxRadius) r = maxRadius;
+       if (r < 0) r = 0;
+      
+       return {
+           x: cx + r * Math.cos(rad),
+           y: cy - r * Math.sin(rad)
+       };
+   });
+  
+   // 物体の輪郭を線で結ぶ
+   ctx.beginPath();
+   ctx.moveTo(processedPoints[0].x, processedPoints[0].y);
+   for(let i = 1; i < processedPoints.length; i++) {
+       ctx.lineTo(processedPoints[i].x, processedPoints[i].y);
+   }
+   ctx.strokeStyle = '#00ff66';
+   ctx.lineWidth = 2.5;
+   ctx.shadowBlur = 8;
+   ctx.shadowColor = '#00ff66'; // ネオン発光エフェクト
+   ctx.stroke();
+   ctx.shadowBlur = 0; // エフェクトリセット
+  
+   // 測定ポイントにドット（点）をプロット
+   ctx.fillStyle = '#ffffff';
+   processedPoints.forEach(p => {
+       ctx.beginPath();
+       ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+       ctx.fill();
+   });
+  
+   // 中心点（センサーの位置）を描画
+   ctx.fillStyle = '#ff3366';
+   ctx.beginPath();
+   ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+   ctx.fill();
+}
+
+
+function processDataAndDraw() {
+   const text = dataInput.value;
+   const mode = angleMode.value;
+   const maxDist = parseFloat(maxDistanceInput.value) || 30;
+  
+   const lines = text.split('\n');
+   const points = [];
+  
+   lines.forEach(line => {
+       // タブ、カンマ、スペースの連続を区切り文字として分割
+       const tokens = line.trim().split(/[\t, ]+/);
+      
+       // データの行に「数値」が2つ以上並んでいる場合のみ抽出
+       if (tokens.length >= 2) {
+           // 後ろから数えて「距離」と「位置」を推測（途中に空の列があっても対応するため）
+           const pos = parseFloat(tokens[tokens.length - 2]);
+           const dist = parseFloat(tokens[tokens.length - 1]);
+          
+           if (!isNaN(pos) && !isNaN(dist)) {
+               points.push({ pos, dist });
+           }
+       }
+   });
+  
+   // 位置(モーターのステップ順)に並び替える
+   points.sort((a, b) => a.pos - b.pos);
+  
+   drawRadar(points, maxDist, mode);
+}
+
+
+// ボタンクリックイベント
+drawBtn.addEventListener('click', processDataAndDraw);
+
+
+// 初回起動時の自動描画
+processDataAndDraw();
+</script>
+</body>
+</html>
+
+
