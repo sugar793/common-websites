@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAME PORTAL - 無料Webゲームコレクション</title>
+  <style>
+    /* ==========================================
+       基本スタイル・変数定義
+       ========================================== */
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(22, 31, 49, 0.8);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --accent-cyan: #00f2fe;
+      --accent-purple: #9d4edd;
+      --accent-pink: #ff2a85;
+      --text-main: #f1f5f9;
+      --text-sub: #94a3b8;
+      --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "メイリオ", meiryo;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(157, 78, 221, 0.08) 0%, transparent 40%);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding-bottom: 60px;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* ==========================================
+       ヘッダー・ヒーローセクション
+       ========================================== */
+    header {
+      padding: 60px 0 40px;
+      text-align: center;
+      position: relative;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 16px;
+      background: linear-gradient(90deg, rgba(0,242,254,0.15), rgba(157,78,221,0.15));
+      border: 1px solid rgba(0,242,254,0.3);
+      border-radius: 20px;
+      color: var(--accent-cyan);
+      font-size: 0.85rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 2.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 0%, var(--accent-cyan) 50%, var(--accent-purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .subtitle {
+      color: var(--text-sub);
+      font-size: 1rem;
+      max-width: 600px;
+      margin: 0 auto 30px;
+    }
+
+    .top-actions {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .btn-top {
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .btn-doc {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+
+    .btn-doc:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .btn-github {
+      background: linear-gradient(135deg, var(--accent-purple), #6200ea);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(157, 78, 221, 0.3);
+    }
+
+    .btn-github:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(157, 78, 221, 0.5);
+    }
+
+    /* ==========================================
+       セクションタイトル
+       ========================================== */
+    .section-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin: 50px 0 25px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-left: 4px solid var(--accent-cyan);
+      padding-left: 12px;
+    }
+
+    /* ==========================================
+       ゲームカードグリッド
+       ========================================== */
+    .game-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 24px;
+    }
+
+    .game-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .game-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .game-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(0, 242, 254, 0.3);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .game-card:hover::before {
+      opacity: 1;
+    }
+
+    .game-tag {
+      font-size: 0.75rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--accent-cyan);
+      display: inline-block;
+      margin-bottom: 12px;
+      width: fit-content;
+    }
+
+    .game-tag.tag-hard {
+      color: var(--accent-pink);
+    }
+
+    .game-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+
+    .game-desc {
+      font-size: 0.9rem;
+      color: var(--text-sub);
+      margin-bottom: 16px;
+      flex-grow: 1;
+    }
+
+    .game-controls {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.825rem;
+      color: #cbd5e1;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .game-controls strong {
+      color: var(--accent-cyan);
+    }
+
+    .play-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      padding: 12px 0;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid rgba(0, 242, 254, 0.4);
+      border-radius: 8px;
+      color: var(--accent-cyan);
+      font-weight: bold;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+    }
+
+    .play-btn:hover {
+      background: linear-gradient(135deg, var(--accent-cyan), #00c6ff);
+      color: #000;
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+    }
+
+    /* ==========================================
+       注意事項エリア
+       ========================================== */
+    .notice-box {
+      background: rgba(255, 42, 133, 0.05);
+      border: 1px solid rgba(255, 42, 133, 0.2);
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 20px;
+    }
+
+    .notice-list {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .notice-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 0.9rem;
+      color: #e2e8f0;
+    }
+
+    .notice-icon {
+      background: rgba(255, 42, 133, 0.2);
+      color: var(--accent-pink);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ==========================================
+       Q&A / コメントコーナー
+       ========================================== */
+    .qa-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .qa-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    .qa-q {
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .qa-q-prefix {
+      color: var(--accent-cyan);
+    }
+
+    .qa-a {
+      font-size: 0.9rem;
+      color: var(--text-sub);
+      padding-left: 24px;
+      border-left: 2px solid rgba(157, 78, 221, 0.4);
+      margin-left: 6px;
+    }
+
+    /* ==========================================
+       フッター
+       ========================================== */
+    footer {
+      text-align: center;
+      margin-top: 80px;
+      padding-top: 20px;
+      border-top: 1px solid var(--card-border);
+      color: var(--text-sub);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 2rem; }
+      .game-grid { grid-template-columns: 1fr; }
+      .notice-list { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- ヘッダー -->
+    <header>
+      <div class="badge">GAME URL PORTAL</div>
+      <h1>WEB GAME COLLECTION</h1>
+      <p class="subtitle">好きなゲームの「PLAY」ボタンを押してすぐに遊べます！暇つぶしやハイスコア挑戦にどうぞ。</p>
+      
+      <div class="top-actions">
+        <a href="https://docs.google.com/document/d/11uMDBKoiIiVbd3x7cpWwfSTlzdslHYBcyI2dvxJraek/edit?tab=t.efg7yiyvjqg" target="_blank" rel="noopener noreferrer" class="btn-top btn-doc">
+          📄 共有ドキュメント（元サイト）
+        </a>
+        <a href="https://github.com/sugar793" target="_blank" rel="noopener noreferrer" class="btn-top btn-github">
+          ⭐ 制作者のGitHubをフォロー
+        </a>
+      </div>
+    </header>
+
+    <!-- メインコンテンツ：ゲーム一覧 -->
+    <main>
+      <h2 class="section-title">ゲームラインナップ</h2>
+      
+      <div class="game-grid">
+
+        <!-- ゲーム1 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">迷路・アクション</span>
+            <h3 class="game-title">迷路鬼ごっこ（初級）</h3>
+            <p class="game-desc">シンプルな迷路の中で鬼から逃げ回る基本アクションゲーム。まずはここから操作に慣れよう！</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 矢印キー（方向キー）または WASD キーで移動
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E8%BF%B7%E8%B7%AF%E9%AC%BC%E3%81%94%E3%81%A3%E3%81%93%EF%BC%88%E5%88%9D%E7%B4%9A%EF%BC%89.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム2 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">迷路・改善版</span>
+            <h3 class="game-title">迷路鬼ごっこ（初級・修正済み）</h3>
+            <p class="game-desc">初級版のバランスや挙動をブラッシュアップした安定版。スムーズなプレイを楽しみたい人におすすめ。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 矢印キー（方向キー）または WASD キーで移動
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E8%BF%B7%E8%B7%AF%E9%AC%BC%E3%81%94%E3%81%A3%E3%81%93%EF%BC%88%E5%88%9D%E7%B4%9A%E3%83%BB%E4%BF%AE%E6%AD%A3%E6%B8%88%E3%81%BF%EF%BC%89.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム3 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag tag-hard">極ムズ・高難易度</span>
+            <h3 class="game-title">迷路鬼ごっこ（超上級）</h3>
+            <p class="game-desc">鬼のスピードと知能が大幅アップ！複雑な迷路を通り抜け、限界まで生き残ることができるか！？</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 矢印キー（方向キー）または WASD キーで移動
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E8%BF%B7%E8%B7%AF%E9%AC%BC%E3%81%94%E3%81%A3%E3%81%93%EF%BC%88%E6%A5%B5%E3%83%A0%E3%82%BA%EF%BC%89.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム4 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">スポーツ・定番</span>
+            <h3 class="game-title">エアホッケー</h3>
+            <p class="game-desc">ゲームセンターでおなじみのエアホッケー！マレットを素早く動かして相手ゴールにパックを叩き込め！</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> マウスカーソル（またはタッチ）でマレットを直接操作
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E3%82%A8%E3%82%A2%E3%83%9B%E3%83%83%E3%82%B1%E3%83%BC.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム5 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">バカゲー・爽快</span>
+            <h3 class="game-title">ぶっ飛びロッキング遊具</h3>
+            <p class="game-desc">公園にあるあの揺れる遊具で限界突破！タイミングよく揺らして、超スピードでぶっ飛ぼう！</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 左右キーでタイミングよく体重移動 / スペースでジャンプ
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E3%81%B3%E3%81%A3%E9%A3%9B%E3%81%B3%E3%83%AD%E3%83%83%E3%82%AD%E3%83%B3%E3%82%B0%E9%81%8A%E5%85%B7.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム6 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">弾幕・回避</span>
+            <h3 class="game-title">あら矢だ</h3>
+            <p class="game-desc">四方八方から飛んでくる危険な「矢」を危機一髪で避け続けるシンプルな弾幕系回避アクション。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> マウス移動 または 矢印キーで自機を操作
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E3%81%82%E3%82%89%E7%9F%A2%E3%81%A0.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム7 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag tag-hard">弾幕・究極高難度</span>
+            <h3 class="game-title">あら矢だ！避けナイト！【究極】</h3>
+            <p class="game-desc">「あら矢だ」の究極進化版！激化する矢の嵐を華麗にかわし、ナイト（騎士）の意地を見せつけろ！</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> マウス移動 または 矢印キーで超絶回避
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E3%81%82%E3%82%89%E7%9F%A2%E3%81%A0%EF%BC%81%E9%81%BF%E3%81%91%E3%83%8A%E3%82%A4%E3%83%88%EF%BC%81%E3%80%90%E7%A9%B6%E6%A5%B5%E3%80%91.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム8 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">リズム・音楽</span>
+            <h3 class="game-title">ギターギッタギタ</h3>
+            <p class="game-desc">ノリノリでギターを掻き鳴らせ！降り注ぐノーツに合わせて弦をギッタギタに弾きまくる爽快音ゲー。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 指定のキーボード操作 または タイミングよくクリック
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E3%82%AE%E3%82%BF%E3%83%BC%E3%82%AE%E3%83%83%E3%82%BF%E3%82%AE%E3%83%83.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム9 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">ステルス・心理戦</span>
+            <h3 class="game-title">バレるな！パソコン</h3>
+            <p class="game-desc">こっそりパソコンで遊べ！人が近づいてきたら一瞬で画面を切り替えて何事もなかったかのように誤魔化せ！</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> クリック/長押しで作業、キーを離すと瞬時に隠す
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E3%83%90%E3%83%AC%E3%82%8B%E3%81%AA%EF%BC%81%E3%83%91%E3%82%BD%E3%82%B3%E3%83%B3.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム10 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">サーフィン・アクション</span>
+            <h3 class="game-title">乗るしかない、このビックウェーブに！</h3>
+            <p class="game-desc">迫り来る伝説のビッグウェーブを乗りこなせ！バランスを保ちながら荒波の上でカッコいいトリックを決めよう。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 左右キーでバランス調整 / 上キーで加速・大ジャンプ
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E4%B9%97%E3%82%8B%E3%81%97%E3%81%8B%E3%81%AA%E3%81%84%E3%80%81%E3%81%93%E3%81%AE%E3%83%93%E3%83%83%E3%82%AF%E3%82%A6%E3%82%A7%E3%83%BC%E3%83%96%E3%81%AB%EF%BC%81.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム11 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">シミュレーション・ネタ</span>
+            <h3 class="game-title">愛のディスタンス</h3>
+            <p class="game-desc">（2次元婚ゲーム）近すぎても遠すぎてもダメ！？適切な「距離感」を保ちながら愛を深めていくシミュレーション。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 矢印キー または マウス操作で間合いを調整
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/2%E6%AC%A1%E5%85%83%E5%A9%9A%E3%82%B2%E3%83%BC%E3%83%A0.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム12 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">2Dアクション</span>
+            <h3 class="game-title">アクションゲーム</h3>
+            <p class="game-desc">王道の横スクロールアクション！次々と現れる障害物をタイミングよくジャンプで跳び越えてゴールを目指せ。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 左右キーで移動 / スペースキーでジャンプ
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/action.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム13 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">スリル・バランス</span>
+            <h3 class="game-title">鉄骨わたり</h3>
+            <p class="game-desc">高所恐怖症注意！足すくむ高所に架けられたグラグラ揺れる鉄骨を、慎重かつ素早く渡り切れ！</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> 左右キーで重心を保ちながら前進
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E9%89%84%E9%AA%A8%E3%82%8F%E3%81%9F%E3%82%8A.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム14 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">パズル・アクション</span>
+            <h3 class="game-title">図形わたり</h3>
+            <p class="game-desc">変化する図形を足場にして向こう岸へ渡れ！適切なタイミングで正しいステップを踏む判断力が鍵。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> マウスクリック または 数字キー選択
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E5%9B%B3%E5%BD%A2%E3%82%8F%E3%81%9F%E3%82%8A.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム15 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">幻想的・癒やし</span>
+            <h3 class="game-title">光集め</h3>
+            <p class="game-desc">暗闇の中に漂う幻想的な「光の粒子」を吸い寄せて集めるリラクゼーション要素のあるスコアアタック。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> マウスカーソルを動かして光を引き寄せる
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E5%85%89%E9%9B%86%E3%82%81.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+        <!-- ゲーム16 -->
+        <div class="game-card">
+          <div>
+            <span class="game-tag">対戦・バトル</span>
+            <h3 class="game-title">コマ</h3>
+            <p class="game-desc">勢いよくコマを回して激突！相手のコマを土俵の外へ弾き飛ばすシンプル＆エキサイティングなバトル。</p>
+            <div class="game-controls">
+              <strong>操作方法:</strong> ドラッグして引っ張って離して回転 / 矢印キーで体当たり
+            </div>
+          </div>
+          <a href="https://sugar793.github.io/common-websites/%E3%82%B3%E3%83%9E.html" target="_blank" rel="noopener noreferrer" class="play-btn">PLAY GAME 🎮</a>
+        </div>
+
+      </div>
+
+      <!-- 注意事項セクション -->
+      <h2 class="section-title">プレイ時の注意事項</h2>
+      <div class="notice-box">
+        <ul class="notice-list">
+          <li class="notice-item">
+            <span class="notice-icon">💾</span>
+            <div><strong>データ保存について:</strong> 電源を切るとセーブデータが消えるため、ハイスコアが出たらスクリーンショットを残すのがオススメ！</div>
+          </li>
+          <li class="notice-item">
+            <span class="notice-icon">⚡</span>
+            <div><strong>動作について:</strong> バッテリーセーバーモードだとFPS（描画速度）が下がり遅くなるので注意！</div>
+          </li>
+          <li class="notice-item">
+            <span class="notice-icon">👁️</span>
+            <div><strong>体調管理:</strong> 画面の見すぎで気分が悪くなったら、無理せず適度に休憩を挟みましょう。</div>
+          </li>
+          <li class="notice-item">
+            <span class="notice-icon">🏫</span>
+            <div><strong>学校でのマナー:</strong> 授業中のプレイは厳禁！リアルな友達との会話も大切にしてくださいね。</div>
+          </li>
+          <li class="notice-item">
+            <span class="notice-icon">🔗</span>
+            <div><strong>共有について:</strong> サイトの共有や紹介はご自由にどうぞ！</div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Q&A・掲示板セクション -->
+      <h2 class="section-title">みんなの質問・コメント</h2>
+      <div class="qa-container">
+        
+        <div class="qa-card">
+          <div class="qa-q"><span class="qa-q-prefix">Q.</span> なんかすぐ目が痛くなる〜〜〜</div>
+          <div class="qa-a">← AIで作成している影響があるかもしれません。いつか人力で目に優しいデザインに修正してみます！</div>
+        </div>
+
+        <div class="qa-card">
+          <div class="qa-q"><span class="qa-q-prefix">Q.</span> バッテリーセーバーモードのときはすべての動きが遅くなるんだが。</div>
+          <div class="qa-a">← FPSという画面の更新回数が落ちるためです。PCを充電しながら遊ぶのが一番の対処法です！</div>
+        </div>
+
+        <div class="qa-card">
+          <div class="qa-q"><span class="qa-q-prefix">Q.</span> パソコン自体の電源を切っちゃった（テヘペロ）</div>
+          <div class="qa-a">← 電源を切ってもデータを残せる仕組みがあるので、今後のアップデートで対応できるよう検討してみます！</div>
+        </div>
+
+        <div class="qa-card">
+          <div class="qa-q"><span class="qa-q-prefix">Q.</span> マウスほし〜〜〜い</div>
+          <div class="qa-a">← そうですか（私は何をすれば？？？笑）</div>
+        </div>
+
+        <div class="qa-card">
+          <div class="qa-q"><span class="qa-q-prefix">Q.</span> 元のドキュメントは「更新」と調べたら出てくるので見つけやすいですね</div>
+          <div class="qa-a">← ほんとですね♫ 見つけやすいのでたくさんの人に教えてあげてください。共有も歓迎です！</div>
+        </div>
+
+        <div class="qa-card">
+          <div class="qa-q"><span class="qa-q-prefix">Q.</span> 一次関数で橋を作って人を渡らせる勉強ゲームはどうですか？？？</div>
+          <div class="qa-a">← いいアイデアですね♫ 一度試作してみて、上手くできたら公開します！</div>
+        </div>
+
+        <div class="qa-card">
+          <div class="qa-q"><span class="qa-q-prefix">Q.</span> 迷路鬼ごっこの対戦版はまだですか？</div>
+          <div class="qa-a">← 試行錯誤中ですが、鬼と逃げのバランスを平等にするのが難しいため、現状は公開が難しそうです。</div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- フッター -->
+    <footer>
+      <p>&copy; GAME PORTAL - Created by sugar793 | Enjoy Playing!</p>
+    </footer>
+  </div>
+
+</body>
+</html>
