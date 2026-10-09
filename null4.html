@@ -1,1 +1,927 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>速度可変！ハイパー観覧車シミュレーター</title>
+    <!-- Tailwind CSS for modern responsive UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D graphics rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for dynamic camera control -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            user-select: none;
+            background-color: #0b0f19;
+            color: #ffffff;
+        }
 
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Responsive layout container for floating UI */
+        .sidebar-container {
+            width: 320px;
+            max-width: calc(100vw - 2rem);
+        }
+
+        /* Glassmorphism card styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+        }
+
+        /* Custom hold buttons animation */
+        .btn-hold {
+            transition: all 0.15s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-hold:active {
+            transform: scale(0.95);
+        }
+        .btn-hold::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .btn-hold:active::after {
+            opacity: 1;
+        }
+
+        /* Graph Overlay Panel Styling */
+        #graphOverlay {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        /* Speed effect visual filter for web camera blur overlay */
+        .speed-lines {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            background: radial-gradient(circle, transparent 40%, rgba(255,255,255,0.15) 90%, rgba(0,255,255,0.3) 100%);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white overflow-hidden select-none">
+
+    <!-- 3D Canvas Viewport -->
+    <div id="canvas-container"></div>
+    
+    <!-- Speed Effect Overlay -->
+    <div id="speedLines" class="speed-lines"></div>
+
+    <!-- Main HUD Overlay Layer -->
+    <div class="relative z-10 w-full h-screen pointer-events-none flex flex-col justify-between p-2 md:p-4">
+        
+        <!-- Header Controls & Viewport Info -->
+        <header class="flex justify-between items-center pointer-events-auto gap-2 z-20">
+            <div class="glass-panel rounded-xl px-3 py-2 flex items-center gap-2">
+                <i class="fa-solid font-bold fa-ferris-wheel text-cyan-400 text-lg"></i>
+                <div>
+                    <h1 class="text-sm md:text-base font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-yellow-300 to-rose-500 leading-none">
+                        ハイパー観覧車 3D
+                    </h1>
+                    <span class="text-[9px] text-slate-400">速度可変・グラフ解析機能付き</span>
+                </div>
+            </div>
+
+            <!-- Top Right: Viewpoint Selector & Audio Toggle -->
+            <div class="flex items-center gap-2">
+                <button id="btnAiPhotoModal" class="glass-panel bg-amber-600/80 hover:bg-amber-500 text-white px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg border border-amber-400/30">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                    <span class="hidden sm:inline">AI記念写真</span>
+                </button>
+                <button id="btnAudioToggle" class="glass-panel hover:bg-slate-800 text-slate-200 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer">
+                    <i id="audioIcon" class="fa-solid fa-volume-xmark text-slate-400"></i>
+                    <span id="audioText" class="hidden sm:inline">サウンド OFF</span>
+                </button>
+                <button id="btnViewToggle" class="glass-panel bg-indigo-600/80 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg border border-indigo-400/30">
+                    <i class="fa-solid fa-camera" id="viewIcon"></i>
+                    <span id="viewText">視点: 3人称（全体）</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace (Left Sidebar layout ensures the central ferris wheel is clear & unobstructed) -->
+        <div class="flex-1 my-2 flex items-start pointer-events-none overflow-hidden">
+            
+            <!-- Left Sidebar Dock for Dashboard & Analytics -->
+            <div class="sidebar-container pointer-events-auto flex flex-col gap-2 max-h-full overflow-y-auto pr-1">
+                
+                <!-- Gauge Dashboard Panel -->
+                <div class="glass-panel rounded-2xl p-2.5 flex flex-col items-center justify-center border border-white/15 shadow-2xl w-full">
+                    
+                    <!-- Speedometer Canvas -->
+                    <div class="relative w-48 h-24 md:w-56 md:h-28 flex justify-center items-center">
+                        <canvas id="gaugeCanvas" width="220" height="115" class="w-full h-full"></canvas>
+                        <div class="absolute bottom-0 flex flex-col items-center text-center">
+                            <span id="speedValue" class="text-xl md:text-2xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
+                                0.0
+                            </span>
+                            <span id="speedUnit" class="text-[9px] md:text-[10px] font-bold text-slate-300 tracking-wider uppercase">km/h</span>
+                        </div>
+                    </div>
+
+                    <!-- Motion Status Indicator Badge -->
+                    <div id="statusBadge" class="mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold tracking-wider uppercase bg-slate-800/90 text-slate-300 border border-slate-600/50">
+                        停止中 (STOPPED)
+                    </div>
+
+                    <!-- Ride Statistics (Altitude & Rotation Direction) -->
+                    <div class="grid grid-cols-2 gap-1.5 w-full mt-2 text-center text-[10px]">
+                        <div class="bg-slate-900/70 rounded-lg p-1 border border-slate-700/40">
+                            <div class="text-slate-400 text-[9px]"><i class="fa-solid fa-mountain text-emerald-400 mr-1"></i>#1 高度</div>
+                            <div id="altValue" class="font-bold font-mono text-emerald-300 text-xs">62.0 m</div>
+                        </div>
+                        <div class="bg-slate-900/70 rounded-lg p-1 border border-slate-700/40">
+                            <div class="text-slate-400 text-[9px]"><i class="fa-solid fa-rotate text-cyan-400 mr-1"></i>回転モード</div>
+                            <div id="dirValue" class="font-bold text-cyan-300 text-xs">正回転 (+)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Altitude Graph Overlay Panel (Always Operable) -->
+                <div id="graphOverlay" class="glass-panel rounded-2xl p-2.5 border border-cyan-500/30 shadow-2xl w-full flex flex-col items-center">
+                    <div class="flex justify-between items-center w-full mb-1 px-0.5">
+                        <div class="flex items-center gap-1 text-cyan-300 font-bold text-xs">
+                            <i class="fa-solid fa-chart-line text-xs"></i>
+                            <span>高度解析グラフ</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button id="btnAiPhysicsReport" class="text-[9px] font-bold text-cyan-200 bg-cyan-900/80 hover:bg-cyan-800 px-1.5 py-0.5 rounded border border-cyan-400/50 transition cursor-pointer flex items-center gap-1">
+                                <i class="fa-solid fa-atom text-cyan-300"></i> 物理解析
+                            </button>
+                            <span id="graphFreq" class="text-[9px] font-mono text-slate-300 bg-slate-800/80 px-1 py-0.5 rounded border border-slate-700">0.00 Hz</span>
+                        </div>
+                    </div>
+                    <!-- Altitude Line Chart Canvas -->
+                    <div class="relative w-full h-24 bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden p-1">
+                        <canvas id="altitudeGraphCanvas" class="w-full h-full block"></canvas>
+                    </div>
+                    <div class="flex justify-between w-full text-[9px] text-slate-400 mt-1 px-1 font-mono">
+                        <span>Min: <strong class="text-slate-200">6m</strong></span>
+                        <span>Mid: <strong class="text-cyan-300">34m</strong></span>
+                        <span>Max: <strong class="text-emerald-400">62m</strong></span>
+                    </div>
+                </div>
+
+                <!-- AI Companion Card -->
+                <div id="aiCompanionCard" class="glass-panel rounded-2xl p-2.5 border border-purple-500/40 shadow-2xl w-full flex flex-col gap-1.5 bg-slate-900/80">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1 text-purple-300 font-bold text-xs">
+                            <i class="fa-solid fa-robot text-purple-400 animate-pulse"></i>
+                            <span>AI同乗者ガイド</span>
+                        </div>
+                        <select id="aiPersonality" class="bg-slate-950 text-purple-200 text-[10px] px-1.5 py-0.5 rounded border border-purple-500/40 outline-none cursor-pointer">
+                            <option value="scared">怖がりな友達</option>
+                            <option value="professor">物理学者教授</option>
+                            <option value="tsundere">ツンデレガイド</option>
+                        </select>
+                    </div>
+
+                    <div id="aiTalkOutput" class="text-[10px] text-slate-200 bg-slate-950/70 p-2 rounded-xl border border-slate-800 min-h-[42px] max-h-[64px] overflow-y-auto leading-relaxed">
+                        「準備はいい？安全バーをしっかり握ってね！」
+                    </div>
+
+                    <button id="btnAiSpeak" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[10px] font-bold py-1 px-2 rounded-xl flex items-center justify-center gap-1 transition shadow cursor-pointer">
+                        <i class="fa-solid fa-comment-dots"></i>
+                        <span>AIガイド発話</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- AI Physics Analysis Modal -->
+        <div id="aiPhysicsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 pointer-events-auto">
+            <div class="glass-panel border border-cyan-400/40 rounded-2xl max-w-lg w-full p-5 flex flex-col gap-3 shadow-2xl bg-slate-900/90 text-white">
+                <div class="flex justify-between items-center border-b border-cyan-500/30 pb-2">
+                    <h3 class="font-black text-cyan-300 flex items-center gap-2 text-base">
+                        <i class="fa-solid fa-calculator text-cyan-400"></i> AI物理学＆遠心力レポート
+                    </h3>
+                    <button id="btnClosePhysicsModal" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div id="aiPhysicsContent" class="text-xs leading-relaxed text-slate-200 max-h-80 overflow-y-auto space-y-2 font-sans bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                    解析中...
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Souvenir Photo Modal -->
+        <div id="aiPhotoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 pointer-events-auto">
+            <div class="glass-panel border border-amber-400/40 rounded-2xl max-w-lg w-full p-5 flex flex-col gap-4 shadow-2xl bg-slate-900/90 text-white">
+                <div class="flex justify-between items-center border-b border-amber-500/30 pb-2">
+                    <h3 class="font-black text-amber-300 flex items-center gap-2 text-base">
+                        <i class="fa-solid fa-camera-retro text-amber-400"></i> AI観覧車 記念フォト撮影
+                    </h3>
+                    <button id="btnClosePhotoModal" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <label class="text-xs font-bold text-amber-200">背景＆写真テーマを選択:</label>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <button class="theme-btn active bg-amber-600/40 border border-amber-400 text-amber-200 p-2 rounded-xl" data-theme="サイバーパンクネオン街">サイバーパンク夜景</button>
+                        <button class="theme-btn bg-slate-800 border border-slate-700 text-slate-300 p-2 rounded-xl" data-theme="花火大会のナイトフェス">大花火大会フェス</button>
+                        <button class="theme-btn bg-slate-800 border border-slate-700 text-slate-300 p-2 rounded-xl" data-theme="オーロラ煌めく銀河夜空">銀河オーロラ夜空</button>
+                        <button class="theme-btn bg-slate-800 border border-slate-700 text-slate-300 p-2 rounded-xl" data-theme="時空ワープハイパードライブ">ハイパードライブワープ</button>
+                    </div>
+                </div>
+
+                <button id="btnGeneratePhoto" class="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 font-bold text-white py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg transition cursor-pointer text-xs">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 記念イラスト写真を生成 (Gemini Image)
+                </button>
+
+                <div id="photoPreviewContainer" class="w-full h-56 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center overflow-hidden relative">
+                    <span id="photoPlaceholder" class="text-xs text-slate-500">テーマを選んで「生成」ボタンを押してください</span>
+                    <img id="photoResult" class="hidden w-full h-full object-cover rounded-xl" alt="Gemini generated photo">
+                    <div id="photoLoading" class="hidden flex-col items-center gap-2 text-amber-300">
+                        <i class="fa-solid fa-spinner fa-spin text-2xl"></i>
+                        <span class="text-xs">AIが写真を描画中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls: Always Accessible and Operable in ALL view modes (including Graph mode) -->
+        <footer class="pointer-events-auto w-full max-w-xl mx-auto flex flex-col gap-1.5 z-20">
+            
+            <!-- Quick Preset Helper Buttons -->
+            <div class="flex justify-center gap-1 text-[10px] flex-wrap">
+                <button id="btnReset" class="glass-panel hover:bg-rose-900/40 text-rose-300 px-2 py-0.5 rounded-lg border border-rose-500/30 transition flex items-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-power-off"></i> 停止 (0)
+                </button>
+                <button id="btnPresetNormal" class="glass-panel hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-600/30 transition cursor-pointer">
+                    通常 (+15)
+                </button>
+                <button id="btnPresetReverse" class="glass-panel hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-600/30 transition cursor-pointer">
+                    逆回転 (-500)
+                </button>
+                <button id="btnPresetHyper" class="glass-panel hover:bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-lg border border-amber-500/30 transition cursor-pointer">
+                    光速 (+50k)
+                </button>
+            </div>
+
+            <!-- Large Interactive Hold Buttons (Operable across all view modes) -->
+            <div class="grid grid-cols-2 gap-2">
+                <!-- Decelerate / Reverse Button (HOLD) -->
+                <button id="btnDecel" class="btn-hold glass-panel bg-gradient-to-r from-blue-900/90 via-cyan-900/90 to-slate-900/90 hover:from-blue-800 hover:to-cyan-800 text-cyan-200 border border-cyan-500/40 rounded-xl p-2.5 md:p-3 flex flex-col items-center justify-center gap-0.5 shadow-xl cursor-pointer touch-none">
+                    <div class="flex items-center gap-2 font-black text-sm md:text-base text-cyan-300">
+                        <i class="fa-solid fa-backward-step text-sm"></i>
+                        <span>減速 / 逆回転</span>
+                    </div>
+                    <span class="text-[9px] text-cyan-200/70 font-medium">【長押し】減速 (最大 -100,000 km/h)</span>
+                </button>
+
+                <!-- Accelerate / Forward Button (HOLD) -->
+                <button id="btnAccel" class="btn-hold glass-panel bg-gradient-to-r from-slate-900/90 via-amber-900/90 to-rose-900/90 hover:from-amber-800 hover:to-rose-800 text-amber-200 border border-amber-500/40 rounded-xl p-2.5 md:p-3 flex flex-col items-center justify-center gap-0.5 shadow-xl cursor-pointer touch-none">
+                    <div class="flex items-center gap-2 font-black text-sm md:text-base text-amber-300">
+                        <span>加速 / 正回転</span>
+                        <i class="fa-solid fa-forward-step text-sm"></i>
+                    </div>
+                    <span class="text-[9px] text-amber-200/70 font-medium">【長押し】加速 (最大 +100,000 km/h)</span>
+                </button>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        const CONFIG = {
+            wheelRadius: 28,
+            wheelCenterY: 34,
+            gondolaCount: 16,
+            minAlt: 6,
+            maxAlt: 62
+        };
+
+        let scene, camera, renderer, controls;
+        let wheelGroup, gondolaGroupArray = [], gondolaAngleOffsetArray = [];
+        let currentSpeed = 0; // km/h
+        let wheelAngle = 0; // radians
+        let isAcceling = false;
+        let isDeceling = false;
+        let currentViewMode = 0; // 0: 3rd person, 1: 1st person gondola, 2: graph view
+        let altitudeHistory = new Array(120).fill(CONFIG.wheelCenterY);
+        let lastTime = performance.now();
+        let isAudioOn = false;
+        let audioCtx = null, motorOsc = null, motorGain = null;
+        let selectedTheme = "サイバーパンクネオン街";
+        let isAiSpeaking = false;
+
+        async function callGeminiApi(apiUrl, payload, maxRetries = 3) {
+            let delay = 1000;
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch (e) {
+                    // Retry backoff
+                }
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+            }
+            throw new Error("Gemini API Request failed");
+        }
+
+        async function triggerAiPassengerTalk() {
+            if (isAiSpeaking) return;
+            isAiSpeaking = true;
+
+            const talkBox = document.getElementById('aiTalkOutput');
+            const personality = document.getElementById('aiPersonality').value;
+            const currentAlt = gondolaGroupArray.length > 0 ? gondolaGroupArray[0].position.y + CONFIG.wheelCenterY : CONFIG.wheelCenterY;
+            
+            talkBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-400"></i> AI考え中...';
+
+            let promptRole = "怖がりな友達";
+            if (personality === "professor") promptRole = "理屈っぽい物理学者の教授";
+            else if (personality === "tsundere") promptRole = "ツンデレな同乗ガイド";
+
+            const systemPrompt = `あなたは観覧車に一緒に乗っている「${promptRole}」です。現在の観覧車の高度は ${currentAlt.toFixed(1)}m、速度は ${currentSpeed.toFixed(0)}km/h (マイナスなら逆回転) です。この状況に対するセリフを日本語60文字以内で一言発話してください。語尾やキャラ付けを徹底してください。`;
+            
+            try {
+                const apiKey = "";
+                const textUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+                const textRes = await callGeminiApi(textUrl, {
+                    contents: [{ parts: [{ text: systemPrompt }] }]
+                });
+                const text = textRes?.candidates?.[0]?.content?.parts?.[0]?.text || "風景がきれいだね！";
+                talkBox.textContent = text;
+            } catch (e) {
+                talkBox.textContent = "「わあ！ここからの景色、最高だね！」";
+            } finally {
+                isAiSpeaking = false;
+            }
+        }
+
+        async function triggerAiPhysicsReport() {
+            const modal = document.getElementById('aiPhysicsModal');
+            const content = document.getElementById('aiPhysicsContent');
+            modal.classList.remove('hidden');
+            content.innerHTML = '<div class="flex items-center gap-2"><i class="fa-solid fa-spinner fa-spin text-cyan-400"></i> Gemini AIが物理計算中...</div>';
+
+            const absSpeed = Math.abs(currentSpeed);
+            const radius = CONFIG.wheelRadius;
+            const v = (absSpeed * 1000) / 3600;
+            const centripetalAcc = (v * v) / radius;
+            const gForce = centripetalAcc / 9.80665;
+
+            const prompt = `観覧車シミュレーターの物理データを解析してください:
+- 速度: ${currentSpeed} km/h
+- 観覧車半径: ${radius} m
+- 算出遠心加速度: ${centripetalAcc.toFixed(2)} m/s^2
+- Gフォース: ${gForce.toFixed(2)} G
+
+専門的な物理学者の視点で、乗客の遠心力、人体への影響、SF的な現象評価を楽しく日本語で解説する短文レポート（Markdown形式）を出力してください。`;
+
+            try {
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+                const res = await callGeminiApi(apiUrl, {
+                    contents: [{ parts: [{ text: prompt }] }]
+                });
+
+                const text = res?.candidates?.[0]?.content?.parts?.[0]?.text || "解析を完了できませんでした。";
+                content.innerHTML = text.replace(/\n/g, '<br>');
+            } catch (e) {
+                content.textContent = "AI物理解析エラーが発生しました。";
+            }
+        }
+
+        async function generateAiSouvenirPhoto() {
+            const placeholder = document.getElementById('photoPlaceholder');
+            const img = document.getElementById('photoResult');
+            const loading = document.getElementById('photoLoading');
+
+            placeholder.classList.add('hidden');
+            img.classList.add('hidden');
+            loading.classList.remove('hidden');
+            loading.classList.add('flex');
+
+            const currentAlt = gondolaGroupArray.length > 0 ? gondolaGroupArray[0].position.y + CONFIG.wheelCenterY : CONFIG.wheelCenterY;
+
+            const prompt = `A colorful high quality 3D digital artwork souvenir postcard photo of a giant futuristic glowing ferris wheel in a theme park. Altitude is ${currentAlt.toFixed(0)} meters, spinning at speed ${currentSpeed} km/h. Theme: ${selectedTheme}. Vibrant lights, high aesthetic details, cinematic atmosphere.`;
+
+            try {
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-image:generateContent?key=${apiKey}`;
+                const res = await callGeminiApi(apiUrl, {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE']
+                    }
+                });
+
+                const base64Data = res?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                if (base64Data) {
+                    img.src = `data:image/png;base64,${base64Data}`;
+                    img.classList.remove('hidden');
+                } else {
+                    placeholder.textContent = "画像の生成に失敗しました。";
+                    placeholder.classList.remove('hidden');
+                }
+            } catch (e) {
+                placeholder.textContent = "生成エラーが発生しました。";
+                placeholder.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+                loading.classList.remove('flex');
+            }
+        }
+
+        function set3rdPersonCamera() {
+            if (!camera || !controls) return;
+            controls.target.set(12, CONFIG.wheelCenterY, 0);
+            camera.position.set(12, CONFIG.wheelCenterY + 10, 85);
+            controls.update();
+        }
+
+        function switchViewMode() {
+            currentViewMode = (currentViewMode + 1) % 3;
+            const viewText = document.getElementById('viewText');
+            const viewIcon = document.getElementById('viewIcon');
+
+            if (currentViewMode === 0) {
+                set3rdPersonCamera();
+                controls.enabled = true;
+                viewText.textContent = "視点: 3人称（全体）";
+                viewIcon.className = "fa-solid fa-camera";
+            } else if (currentViewMode === 1) {
+                controls.enabled = false;
+                viewText.textContent = "視点: 1人称（ゴンドラ内）";
+                viewIcon.className = "fa-solid fa-eye";
+            } else if (currentViewMode === 2) {
+                controls.enabled = false;
+                camera.position.set(12, CONFIG.wheelCenterY, 70);
+                camera.lookAt(12, CONFIG.wheelCenterY, 0);
+                viewText.textContent = "視点: 高度解析（グラフ）";
+                viewIcon.className = "fa-solid fa-chart-line";
+            }
+        }
+
+        function initAudio() {
+            if (audioCtx) return;
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                motorOsc = audioCtx.createOscillator();
+                motorGain = audioCtx.createGain();
+
+                motorOsc.type = 'sawtooth';
+                motorOsc.frequency.setValueAtTime(40, audioCtx.currentTime);
+                motorGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+                motorOsc.connect(motorGain);
+                motorGain.connect(audioCtx.destination);
+                motorOsc.start();
+            } catch (e) {
+                console.warn("Audio context failed to start", e);
+            }
+        }
+
+        function updateAudioPitch() {
+            if (!audioCtx || !isAudioOn) return;
+            const absSpeed = Math.abs(currentSpeed);
+            if (absSpeed < 0.1) {
+                motorGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+            } else {
+                motorGain.gain.setTargetAtTime(0.08, audioCtx.currentTime, 0.1);
+                const freq = 40 + Math.min(absSpeed, 5000) * 0.25;
+                motorOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.1);
+            }
+        }
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.008);
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            set3rdPersonCamera();
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x223344, 1.2);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffeedd, 1.5);
+            dirLight.position.set(40, 80, 50);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            // Center Point Light for Neons
+            const centerLight = new THREE.PointLight(0x00ffff, 2, 80);
+            centerLight.position.set(12, CONFIG.wheelCenterY, 0);
+            scene.add(centerLight);
+
+            // Ground Plane
+            const groundGeo = new THREE.PlaneGeometry(300, 300);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x070b12, roughness: 0.8 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Ground Grid Lines
+            const gridHelper = new THREE.GridHelper(300, 60, 0x00ffff, 0x1e293b);
+            gridHelper.position.y = 0.1;
+            scene.add(gridHelper);
+
+            // Build Ferris Wheel Assembly
+            createFerrisWheel();
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createFerrisWheel() {
+            const ferrisRoot = new THREE.Group();
+            ferrisRoot.position.set(12, 0, 0);
+
+            // Support Pillars (A-Frame)
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+            const legGeo = new THREE.CylinderGeometry(0.8, 1.2, CONFIG.wheelCenterY * 1.15);
+            
+            const leftLeg = new THREE.Mesh(legGeo, legMat);
+            leftLeg.position.set(-10, CONFIG.wheelCenterY / 2, -2);
+            leftLeg.rotation.z = -0.28;
+            ferrisRoot.add(leftLeg);
+
+            const rightLeg = new THREE.Mesh(legGeo, legMat);
+            rightLeg.position.set(10, CONFIG.wheelCenterY / 2, -2);
+            rightLeg.rotation.z = 0.28;
+            ferrisRoot.add(rightLeg);
+
+            // Center Axle Hub
+            const hubGeo = new THREE.CylinderGeometry(3, 3, 4, 32);
+            const hubMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.1 });
+            const hub = new THREE.Mesh(hubGeo, hubMat);
+            hub.rotation.x = Math.PI / 2;
+            hub.position.set(0, CONFIG.wheelCenterY, 0);
+            ferrisRoot.add(hub);
+
+            // Rotating Wheel Group
+            wheelGroup = new THREE.Group();
+            wheelGroup.position.set(0, CONFIG.wheelCenterY, 0);
+
+            // Outer Rings
+            const ringGeo = new THREE.TorusGeometry(CONFIG.wheelRadius, 0.6, 16, 64);
+            const ringMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x0891b2, emissiveIntensity: 0.5 });
+            
+            const ring1 = new THREE.Mesh(ringGeo, ringMat);
+            ring1.position.z = 1.5;
+            wheelGroup.add(ring1);
+
+            const ring2 = new THREE.Mesh(ringGeo, ringMat);
+            ring2.position.z = -1.5;
+            wheelGroup.add(ring2);
+
+            // Spokes & Gondolas
+            const gondolaColors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899];
+            
+            for (let i = 0; i < CONFIG.gondolaCount; i++) {
+                const angle = (i / CONFIG.gondolaCount) * Math.PI * 2;
+                gondolaAngleOffsetArray.push(angle);
+
+                // Spoke Beam
+                const spokeGeo = new THREE.CylinderGeometry(0.2, 0.2, CONFIG.wheelRadius * 2);
+                const spokeMat = new THREE.MeshStandardMaterial({ color: 0x64748b });
+                const spoke = new THREE.Mesh(spokeGeo, spokeMat);
+                spoke.rotation.z = angle;
+                wheelGroup.add(spoke);
+
+                // Gondola Group Container (Pivot at attachment point)
+                const gGroup = new THREE.Group();
+                const gx = Math.cos(angle) * CONFIG.wheelRadius;
+                const gy = Math.sin(angle) * CONFIG.wheelRadius;
+                gGroup.position.set(gx, gy, 0);
+
+                // Cabin Box Mesh
+                const cabGeo = new THREE.BoxGeometry(3.2, 3.6, 2.8);
+                const isFirst = (i === 0);
+                const cabColor = isFirst ? 0xff1144 : gondolaColors[i % gondolaColors.length];
+                const cabMat = new THREE.MeshStandardMaterial({
+                    color: cabColor,
+                    metalness: 0.3,
+                    roughness: 0.3,
+                    emissive: cabColor,
+                    emissiveIntensity: isFirst ? 0.6 : 0.2
+                });
+                const cabin = new THREE.Mesh(cabGeo, cabMat);
+                cabin.position.y = -1.8;
+                gGroup.add(cabin);
+
+                // Gondola #1 Badge
+                if (isFirst) {
+                    const tagGeo = new THREE.SphereGeometry(0.8, 16, 16);
+                    const tagMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                    const tag = new THREE.Mesh(tagGeo, tagMat);
+                    tag.position.set(0, 1.2, 0);
+                    gGroup.add(tag);
+                }
+
+                wheelGroup.add(gGroup);
+                gondolaGroupArray.push(gGroup);
+            }
+
+            ferrisRoot.add(wheelGroup);
+            scene.add(ferrisRoot);
+        }
+
+        function drawGauge() {
+            const canvas = document.getElementById('gaugeCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2;
+            const cy = h - 15;
+            const radius = 80;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Background Arc
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI, false);
+            ctx.lineWidth = 14;
+            ctx.strokeStyle = '#1e293b';
+            ctx.stroke();
+
+            // Dynamic Value Fill Arc
+            const absSpd = Math.abs(currentSpeed);
+            const ratio = Math.min(absSpd / 1000, 1); // Normalized gauge sweep
+            const fillAngle = Math.PI + ratio * Math.PI;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, Math.PI, fillAngle, false);
+            ctx.lineWidth = 14;
+            ctx.strokeStyle = currentSpeed < 0 ? '#06b6d4' : (absSpd > 1000 ? '#f59e0b' : '#10b981');
+            ctx.stroke();
+
+            // Needle
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(fillAngle - Math.PI / 2);
+            ctx.beginPath();
+            ctx.moveTo(-3, 0);
+            ctx.lineTo(0, -radius + 8);
+            ctx.lineTo(3, 0);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.restore();
+
+            // Update Text Displays
+            document.getElementById('speedValue').textContent = currentSpeed.toFixed(1);
+            
+            const badge = document.getElementById('statusBadge');
+            if (Math.abs(currentSpeed) < 0.1) {
+                badge.textContent = "停止中 (STOPPED)";
+                badge.className = "mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold tracking-wider uppercase bg-slate-800/90 text-slate-300 border border-slate-600/50";
+            } else if (currentSpeed > 0) {
+                badge.textContent = currentSpeed > 1000 ? "超光速 (HYPER DRIVE)" : "正回転 (FORWARD)";
+                badge.className = "mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold tracking-wider uppercase bg-amber-900/80 text-amber-300 border border-amber-500/50";
+            } else {
+                badge.textContent = "逆回転 (REVERSE)";
+                badge.className = "mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold tracking-wider uppercase bg-cyan-900/80 text-cyan-300 border border-cyan-500/50";
+            }
+
+            document.getElementById('dirValue').textContent = currentSpeed >= 0 ? "正回転 (+)" : "逆回転 (-)";
+        }
+
+        function drawAltitudeGraph() {
+            const canvas = document.getElementById('altitudeGraphCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width = canvas.parentElement.clientWidth;
+            const h = canvas.height = canvas.parentElement.clientHeight;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+            ctx.moveTo(0, h / 4); ctx.lineTo(w, h / 4);
+            ctx.moveTo(0, (3 * h) / 4); ctx.lineTo(w, (3 * h) / 4);
+            ctx.stroke();
+
+            // Line Plot
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            const step = w / (altitudeHistory.length - 1);
+            for (let i = 0; i < altitudeHistory.length; i++) {
+                const alt = altitudeHistory[i];
+                // Map altitude (6m to 62m) to Y canvas coordinates
+                const norm = (alt - CONFIG.minAlt) / (CONFIG.maxAlt - CONFIG.minAlt);
+                const y = h - (norm * (h - 12) + 6);
+                const x = i * step;
+
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Frequency Display Calculation
+            const absSpeed = Math.abs(currentSpeed);
+            const circumference = 2 * Math.PI * CONFIG.wheelRadius;
+            const vMps = (absSpeed * 1000) / 3600;
+            const hz = vMps / circumference;
+            document.getElementById('graphFreq').textContent = `${hz.toFixed(2)} Hz`;
+        }
+
+        function updateSpeed(dt) {
+            if (isAcceling) {
+                const absSpd = Math.abs(currentSpeed);
+                const rate = 15 + absSpd * 0.8;
+                currentSpeed = Math.min(100000, currentSpeed + rate * dt);
+            }
+            if (isDeceling) {
+                const absSpd = Math.abs(currentSpeed);
+                const rate = 15 + absSpd * 0.8;
+                currentSpeed = Math.max(-100000, currentSpeed - rate * dt);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            updateSpeed(dt);
+            updateAudioPitch();
+
+            // Angular velocity calculation (rad/s)
+            const speedMps = (currentSpeed * 1000) / 3600;
+            const angularVelocity = speedMps / CONFIG.wheelRadius;
+            wheelAngle += angularVelocity * dt;
+
+            // Rotate main wheel structure
+            if (wheelGroup) {
+                wheelGroup.rotation.z = wheelAngle;
+
+                // Keep gondolas hanging upright (counter-rotate)
+                gondolaGroupArray.forEach((gondola) => {
+                    gondola.rotation.z = -wheelAngle;
+                });
+            }
+
+            // Track Gondola #1 altitude
+            if (gondolaGroupArray.length > 0) {
+                const g1Alt = Math.sin(wheelAngle + gondolaAngleOffsetArray[0]) * CONFIG.wheelRadius + CONFIG.wheelCenterY;
+                document.getElementById('altValue').textContent = `${g1Alt.toFixed(1)} m`;
+
+                altitudeHistory.push(g1Alt);
+                if (altitudeHistory.length > 120) altitudeHistory.shift();
+            }
+
+            // Camera Update for Mode 1 (1st Person Gondola #1)
+            if (currentViewMode === 1 && gondolaGroupArray.length > 0) {
+                const g1 = gondolaGroupArray[0];
+                const worldPos = new THREE.Vector3();
+                g1.getWorldPosition(worldPos);
+
+                camera.position.set(worldPos.x, worldPos.y - 0.5, worldPos.z + 0.2);
+                camera.lookAt(worldPos.x + 10, worldPos.y, worldPos.z);
+            } else if (currentViewMode === 0 && controls) {
+                controls.update();
+            }
+
+            // Speed Lines Visual Overlay Effect
+            const speedOverlay = document.getElementById('speedLines');
+            if (Math.abs(currentSpeed) > 300) {
+                speedOverlay.style.opacity = Math.min(Math.abs(currentSpeed) / 2000, 0.8);
+            } else {
+                speedOverlay.style.opacity = 0;
+            }
+
+            drawGauge();
+            drawAltitudeGraph();
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function setupEventListeners() {
+            const btnAccel = document.getElementById('btnAccel');
+            const btnDecel = document.getElementById('btnDecel');
+
+            // Accel Hold Events
+            const startAccel = (e) => { e.preventDefault(); isAcceling = true; initAudio(); };
+            const stopAccel = () => { isAcceling = false; };
+
+            btnAccel.addEventListener('pointerdown', startAccel);
+            btnAccel.addEventListener('pointerup', stopAccel);
+            btnAccel.addEventListener('pointerleave', stopAccel);
+
+            // Decel Hold Events
+            const startDecel = (e) => { e.preventDefault(); isDeceling = true; initAudio(); };
+            const stopDecel = () => { isDeceling = false; };
+
+            btnDecel.addEventListener('pointerdown', startDecel);
+            btnDecel.addEventListener('pointerup', stopDecel);
+            btnDecel.addEventListener('pointerleave', stopDecel);
+
+            // Preset Buttons
+            document.getElementById('btnReset').addEventListener('click', () => { currentSpeed = 0; });
+            document.getElementById('btnPresetNormal').addEventListener('click', () => { currentSpeed = 15; });
+            document.getElementById('btnPresetReverse').addEventListener('click', () => { currentSpeed = -500; });
+            document.getElementById('btnPresetHyper').addEventListener('click', () => { currentSpeed = 50000; });
+
+            // View & Audio Toggles
+            document.getElementById('viewText').parentElement.addEventListener('click', switchViewMode);
+            
+            document.getElementById('btnAudioToggle').addEventListener('click', () => {
+                initAudio();
+                isAudioOn = !isAudioOn;
+                document.getElementById('audioText').textContent = isAudioOn ? "サウンド ON" : "サウンド OFF";
+                document.getElementById('audioIcon').className = isAudioOn ? "fa-solid fa-volume-high text-cyan-400" : "fa-solid fa-volume-xmark text-slate-400";
+            });
+
+            // AI Passengers & Dialog Modals
+            document.getElementById('btnAiSpeak').addEventListener('click', triggerAiPassengerTalk);
+            document.getElementById('btnAiPhysicsReport').addEventListener('click', triggerAiPhysicsReport);
+            document.getElementById('btnClosePhysicsModal').addEventListener('click', () => {
+                document.getElementById('aiPhysicsModal').classList.add('hidden');
+            });
+
+            document.getElementById('btnAiPhotoModal').addEventListener('click', () => {
+                document.getElementById('aiPhotoModal').classList.remove('hidden');
+            });
+            document.getElementById('btnClosePhotoModal').addEventListener('click', () => {
+                document.getElementById('aiPhotoModal').classList.add('hidden');
+            });
+
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.theme-btn').forEach(b => {
+                        b.classList.remove('active', 'bg-amber-600/40', 'border-amber-400', 'text-amber-200');
+                        b.classList.add('bg-slate-800', 'border-slate-700', 'text-slate-300');
+                    });
+                    btn.classList.add('active', 'bg-amber-600/40', 'border-amber-400', 'text-amber-200');
+                    btn.classList.remove('bg-slate-800', 'border-slate-700', 'text-slate-300');
+                    selectedTheme = btn.getAttribute('data-theme');
+                });
+            });
+
+            document.getElementById('btnGeneratePhoto').addEventListener('click', generateAiSouvenirPhoto);
+        }
+
+        // Initialize Application on Window Load
+        window.onload = function () {
+            init3D();
+            setupEventListeners();
+            animate();
+        };
+    </script>
+</body>
+</html>
